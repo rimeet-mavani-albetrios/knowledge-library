@@ -1,0 +1,8 @@
+node_modules/
+web/dist/
+.cache/
+.data/
+.env
+.DS_Store
+.claude/
+.vite/

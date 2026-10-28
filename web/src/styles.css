@@ -1,0 +1,3516 @@
+/* Knowledge Atlas — chart-paper background, deep ink, and a "territory" color per category
+   that is shared by the map dots, the filter chips and the frames around the cards. */
+
+:root {
+  --font: 'Figtree Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --display: 'Bricolage Grotesque Variable', 'Figtree Variable', system-ui, sans-serif;
+
+  --bg: #f6f7fb;
+  --surface: #ffffff;
+  --surface-2: #eff1f6;
+  --line: #e3e6ee;
+  --line-strong: #cdd2de;
+  --text: #14182b;
+  --text-2: #444b62;
+  --muted: #6b7287;
+  --accent: #4b3ff0;
+  --accent-hover: #3a2fd6;
+  --on-accent: #ffffff;
+  --accent-soft: #eef0ff;
+  --accent-text: #3f34d8;
+  --grid-dot: rgb(20 24 43 / 0.09);
+  --danger: #c4372f;
+  --danger-soft: #fdecea;
+  --success: #1c7c54;
+  --warning: #9a5b00;
+  --shadow: 0 1px 2px rgb(20 24 43 / 0.05), 0 8px 24px rgb(20 24 43 / 0.08);
+  --backdrop: rgb(15 18 32 / 0.5);
+
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --header-h: 68px;
+  color-scheme: light;
+}
+
+:root[data-theme='dark'] {
+  --bg: #0f1220;
+  --surface: #171b2e;
+  --surface-2: #1f2439;
+  --line: #272c44;
+  --line-strong: #3a4060;
+  --text: #e8eaf4;
+  --text-2: #bdc2d6;
+  --muted: #9097b0;
+  --accent: #a9a2ff;
+  --accent-hover: #c4bfff;
+  --on-accent: #14182b;
+  --accent-soft: #262b55;
+  --accent-text: #bdb7ff;
+  --grid-dot: rgb(232 234 244 / 0.07);
+  --danger: #ff8a80;
+  --danger-soft: #3d1d22;
+  --success: #5dd4a0;
+  --warning: #f2c14e;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px rgb(0 0 0 / 0.35);
+  --backdrop: rgb(4 6 14 / 0.7);
+  color-scheme: dark;
+}
+
+/* Territory colors: an element with style="--hue: …" gets a soft background and a readable text color
+   made from it, in both themes. */
+[style*='--hue'] {
+  --hue-soft: color-mix(in oklab, var(--hue) 16%, var(--surface));
+  --hue-ink: color-mix(in oklab, var(--hue) 58%, var(--text));
+}
+
+/* ---------- Base ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--grid-dot) 1px, transparent 1.3px);
+  background-size: 22px 22px;
+  color: var(--text);
+  font: 400 15px/1.55 var(--font);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+a {
+  color: var(--accent-text);
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.25;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -48px;
+  z-index: 100;
+  background: var(--accent);
+  color: var(--on-accent);
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+}
+
+.skip-link:focus {
+  top: 12px;
+}
+
+.container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.show-small {
+  display: none;
+}
+
+/* ---------- Buttons and fields ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  font-weight: 600;
+  font-size: 14.5px;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+}
+
+.btn-ghost {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--text);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: var(--surface);
+}
+
+.icon-btn {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-2);
+  flex: none;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+}
+
+.icon-btn.danger:hover {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.input {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 15px;
+}
+
+.input:hover {
+  border-color: var(--line-strong);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+textarea.input {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--surface-2);
+  border-radius: 10px;
+}
+
+.segmented button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  min-width: 34px;
+  justify-content: center;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.segmented button:hover {
+  color: var(--text);
+}
+
+.segmented button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+.segmented-text button {
+  padding: 0 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--hue-soft);
+  color: var(--hue-ink);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.pill-accent {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+kbd {
+  font: 600 12px var(--font);
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  padding: 1px 7px;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.form-error {
+  color: var(--danger);
+  font-size: 14px;
+  margin: 10px 0 0;
+}
+
+.warn {
+  color: var(--warning);
+}
+
+/* ---------- Header ---------- */
+
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid transparent;
+  transition: border-color 0.2s, background-color 0.2s;
+}
+
+.app-header.is-scrolled {
+  background: var(--bg);
+  border-bottom-color: var(--line);
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  height: var(--header-h);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+  min-width: 0;
+}
+
+.brand-text {
+  min-width: 0;
+}
+
+.brand h1 {
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.brand-count {
+  display: block;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* The small search box that shows in the top bar once the big one has scrolled away. */
+.header-search {
+  flex: 1;
+  min-width: 0;
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.search-compact .search-box {
+  height: 44px;
+  gap: 10px;
+  padding: 0 4px 0 14px;
+  border-width: 1px;
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.search-compact .search-box input {
+  font-size: 15.5px;
+}
+
+.search-compact .icon-btn {
+  width: 34px;
+  height: 34px;
+}
+
+.theme-cycle {
+  display: none;
+}
+
+.menu-wrap {
+  position: relative;
+}
+
+.menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  min-width: 250px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  z-index: 30;
+}
+
+.menu a,
+.menu button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 14px;
+  text-align: left;
+}
+
+.menu a:hover,
+.menu button:hover {
+  background: var(--surface-2);
+}
+
+.menu-label {
+  margin: 4px 10px 4px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* ---------- Page layout ---------- */
+/* Big screens: search on the left, a short map on the right, then the toolbar and the results.
+   The layout stays the same while you search, so the search box never moves. */
+
+.page {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-areas:
+    'hero map'
+    'browse browse';
+  column-gap: 40px;
+  align-items: center;
+  padding-top: 20px;
+}
+
+.hero {
+  grid-area: hero;
+  min-width: 0;
+}
+
+.page > .map {
+  grid-area: map;
+  min-width: 0;
+}
+
+.page > .browse {
+  grid-area: browse;
+  min-width: 0;
+  /* Leaves room for the top bar when the page scrolls here. */
+  scroll-margin-top: var(--header-h);
+}
+
+/* ---------- Search ---------- */
+
+.hero-title {
+  font-family: var(--display);
+  font-size: clamp(28px, 3.3vw, 46px);
+  font-weight: 750;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  margin-bottom: 18px;
+  text-wrap: balance;
+}
+
+/* ---------- Knowledge map ---------- */
+
+.map {
+  margin: 0;
+}
+
+/* The map's note sits inside its frame, so the map takes no extra room. */
+.map {
+  position: relative;
+}
+
+.map figcaption {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  margin: 0;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface) 85%, transparent);
+  color: var(--muted);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.map-frame {
+  position: relative;
+  aspect-ratio: 1000 / 620;
+  border-radius: 24px;
+  border: 1px solid var(--line);
+  background-color: var(--surface);
+  background-image: radial-gradient(var(--grid-dot) 1.2px, transparent 1.5px);
+  background-size: 18px 18px;
+  overflow: hidden;
+}
+
+.map:not(.is-panel) .map-frame {
+  aspect-ratio: 1000 / 440;
+}
+
+/* Opened with the toolbar's Map button, above the results. It keeps the map's own shape, so the dots
+   spread out instead of crowding in the middle of a wide, flat box. */
+.map.is-panel {
+  max-width: 720px;
+  margin: 10px auto 0;
+}
+
+.map.is-panel .map-frame {
+  aspect-ratio: 1000 / 600;
+}
+
+.map-frame > svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.map-dot {
+  cursor: pointer;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: dot-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1.3) both;
+  transition: opacity 0.25s;
+}
+
+.map.is-settled .map-dot {
+  animation: none;
+}
+
+.map-core {
+  fill: var(--hue);
+  stroke: var(--surface);
+  stroke-width: 2;
+  transition: r 0.15s;
+}
+
+.map-halo {
+  fill: var(--hue);
+  opacity: 0.12;
+  transition: opacity 0.25s;
+}
+
+[data-theme='dark'] .map-halo {
+  opacity: 0.2;
+}
+
+/* A search or filter dims every dot with this one change; the matching ones are drawn again on top (.map-lit). */
+.map-all {
+  transition: opacity 0.25s;
+}
+
+.map.is-narrowed .map-all {
+  opacity: 0.16;
+}
+
+/* The lit dots pulse twice to show where they are, then rest, so the page isn't redrawing all the time. */
+.map-dot.is-lit .map-halo {
+  opacity: 0.35;
+  animation: halo 1.8s ease-in-out 2;
+}
+
+.map-dot.is-hovered {
+  pointer-events: none;
+}
+
+.map-link {
+  stroke: var(--hue);
+  stroke-width: 1.2;
+  opacity: 0.35;
+  stroke-dasharray: 3 4;
+}
+
+.map-label {
+  font-family: var(--display);
+  font-size: calc(var(--label-size, 22) * 1px);
+  transition: opacity 0.25s;
+  font-weight: 700;
+  fill: var(--hue-ink);
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 6px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  letter-spacing: -0.01em;
+}
+
+.map-label.is-dim {
+  opacity: 0.2;
+}
+
+/* While searching, category names step back so the lit dots stand out. */
+.map-label.is-faded {
+  opacity: 0.55;
+}
+
+.map-tip {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-50%, calc(-100% - 16px));
+  max-width: 240px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  pointer-events: none;
+  box-shadow: var(--shadow);
+}
+
+.map-tip span {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: color-mix(in oklab, var(--hue) 55%, var(--bg));
+  margin-bottom: 2px;
+}
+
+.map-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+@keyframes dot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+}
+
+@keyframes halo {
+  50% {
+    opacity: 0.12;
+  }
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 64px;
+  padding: 0 12px 0 20px;
+  background: var(--surface);
+  border: 1.5px solid var(--line-strong);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px -18px rgb(20 24 43 / 0.35);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.search-box:hover {
+  border-color: var(--line-strong);
+}
+
+.search-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.search-icon {
+  color: var(--muted);
+  flex: none;
+}
+
+.search-box input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  font-size: 17.5px;
+  outline: none;
+}
+
+.search-box input::placeholder {
+  color: var(--muted);
+}
+
+.search-box input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search-box kbd {
+  margin-right: 8px;
+}
+
+/* The panel under the search box: top results, tags, recent searches, and "See all".
+   It opens over the page, so nothing below it moves. Its height is set to fit the screen (see SearchBar.jsx). */
+.search-field {
+  position: relative;
+}
+
+.suggest {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  max-height: min(460px, 60vh);
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.suggest-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+}
+
+.suggest-list:empty {
+  display: none;
+}
+
+.suggest-status {
+  margin: 0;
+  padding: 14px 16px 8px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* The last results stay while the next ones load, a little faded, so the panel doesn't blink as you type. */
+.suggest-result {
+  transition: opacity 0.15s;
+}
+
+.suggest.is-faded .suggest-result {
+  opacity: 0.55;
+}
+
+/* "See all" stays at the bottom of the panel while the rest scrolls. */
+.suggest-foot {
+  position: sticky;
+  bottom: 0;
+  margin: 6px -6px -6px;
+  padding: 6px;
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.suggest-foot .suggest-text {
+  font-weight: 600;
+  color: var(--accent-text);
+}
+
+.suggest-foot .suggest-glyph {
+  color: var(--accent-text);
+}
+
+.suggest-heading {
+  margin: 6px 10px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.suggest li:not(:first-child) .suggest-heading {
+  margin-top: 10px;
+}
+
+.suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 5px 10px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.suggest-item.is-active {
+  background: var(--surface-2);
+}
+
+.suggest-item .row-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  flex: none;
+}
+
+.suggest-item .row-icon img {
+  width: 18px;
+  height: 18px;
+}
+
+.suggest-glyph {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  color: var(--muted);
+}
+
+.suggest-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+}
+
+.suggest-note {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.suggest-forget {
+  opacity: 0.6;
+}
+
+.suggest-item:hover .suggest-forget,
+.suggest-item.is-active .suggest-forget {
+  opacity: 1;
+}
+
+/* One line of examples; more slide in sideways. */
+.examples {
+  display: flex;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 12px 0 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  font-size: 14px;
+  color: var(--muted);
+  mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
+}
+
+.examples button {
+  flex: none;
+  border: 1px dashed var(--line-strong);
+  background: transparent;
+  border-radius: 999px;
+  padding: 3px 12px;
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+
+.examples button:hover {
+  border-style: solid;
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+/* ---------- Filters: the badge, the chips of filters that are on ---------- */
+
+.filters-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.active-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip-active {
+  height: 32px;
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-text);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.chip:hover:not(:disabled) {
+  border-color: var(--line-strong);
+}
+
+.chip:disabled {
+  opacity: 0.45;
+}
+
+.chip-icon {
+  color: var(--hue-ink, var(--muted));
+}
+
+.chip-count {
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.chip[aria-pressed='true'] {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--bg);
+}
+
+.chip[aria-pressed='true'] .chip-count,
+.chip[aria-pressed='true'] .chip-icon {
+  color: inherit;
+  opacity: 0.75;
+}
+
+.chip-active-tag {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-text);
+}
+
+.tag-list button {
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: 13.5px;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.tag-list button:hover {
+  background: var(--accent-soft);
+}
+
+/* ---------- Toolbar: categories, Filters, Sort, Map, Select, cards or list ---------- */
+/* On big screens it sticks under the top bar while you scroll the results. */
+
+:root {
+  --toolbar-h: 64px; /* the sticky toolbar's height, so scrolling stops just under it */
+}
+
+.browse {
+  padding-top: 14px;
+}
+
+.toolbar-wrap {
+  position: sticky;
+  top: var(--header-h);
+  z-index: 16;
+  margin: 0 -10px;
+  padding: 6px 10px;
+}
+
+.toolbar-wrap.is-stuck {
+  background: var(--bg);
+  box-shadow: 0 1px 0 var(--line);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.toolbar-tools {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding-left: 8px;
+  border-left: 1px solid var(--line);
+}
+
+.toolbar .segmented button {
+  height: 30px;
+  min-width: 32px;
+}
+
+/* Categories: one row that slides sideways. The ‹ › buttons and a fade show there's more. */
+.cat-tabs {
+  position: relative;
+  display: flex;
+  flex: 1;
+  min-width: 0;
+}
+
+.cat-row {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.cat-row::-webkit-scrollbar {
+  display: none;
+}
+
+.cat-tabs.more-right .cat-row {
+  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
+}
+
+.cat-tabs.more-left .cat-row {
+  mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent);
+}
+
+.cat-tabs.more-left.more-right .cat-row {
+  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
+}
+
+.cat-tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.cat-tab:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* The color dot matches the category's dots on the map. */
+.cat-tab.has-hue::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--hue);
+}
+
+.cat-tab[aria-pressed='true'] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.cat-tab.has-hue[aria-pressed='true'] {
+  background: var(--hue-soft);
+  color: var(--hue-ink);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--hue) 45%, transparent);
+}
+
+.cat-count {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cat-tab[aria-pressed='true'] .cat-count {
+  color: inherit;
+  opacity: 0.7;
+}
+
+.cat-arrow {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  transform: translateY(-50%);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.cat-arrow:hover {
+  border-color: var(--line-strong);
+}
+
+.cat-arrow.left {
+  left: 0;
+}
+
+.cat-arrow.right {
+  right: 0;
+}
+
+.cat-arrow[hidden] {
+  display: none;
+}
+
+/* Touch screens slide the row with a finger. */
+@media (hover: none) {
+  .cat-arrow {
+    display: none;
+  }
+}
+
+/* The toolbar's buttons: all the same height and shape. */
+.tool-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.tool-btn:hover,
+.tool-btn.is-open {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+
+.tool-btn.is-on {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-text);
+}
+
+.tool-btn svg {
+  flex: none;
+}
+
+.tool-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The single cards-or-list button is for phones; big screens show both choices. */
+.view-cycle {
+  display: none;
+}
+
+.tool-chevron {
+  color: var(--muted);
+  transition: transform 0.15s;
+}
+
+.tool-btn.is-open .tool-chevron {
+  transform: rotate(180deg);
+}
+
+/* ---------- Our own dropdowns and panels (see Popover.jsx) ---------- */
+
+.dropdown {
+  position: relative;
+}
+
+.popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 40;
+  min-width: 230px;
+  padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  animation: pop-in 0.14s ease-out;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Phones only: the dimmed page behind a sheet, and the sheet's title bar. */
+.sheet-backdrop,
+.sheet-head {
+  display: none;
+}
+
+.menu-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.menu-option:hover,
+.menu-option:focus-visible {
+  background: var(--surface-2);
+  outline: none;
+}
+
+.menu-icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.menu-text {
+  flex: 1;
+}
+
+.menu-count {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.menu-check {
+  flex: none;
+  color: var(--accent);
+  visibility: hidden;
+}
+
+.menu-option[aria-selected='true'] {
+  font-weight: 600;
+}
+
+.menu-option[aria-selected='true'] .menu-icon {
+  color: var(--accent-text);
+}
+
+.menu-option[aria-selected='true'] .menu-check {
+  visibility: visible;
+}
+
+/* The Filters panel: named sections that scroll, and a footer that stays. */
+.filters-pop {
+  width: 420px;
+  padding: 0;
+}
+
+.filters-panel {
+  display: flex;
+  flex-direction: column;
+  max-height: min(72vh, 580px);
+}
+
+.fp-body {
+  display: grid;
+  gap: 18px;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.fp-title {
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.fp-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.fp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.fp-chip svg {
+  color: var(--muted);
+}
+
+.fp-chip:hover {
+  border-color: var(--line-strong);
+}
+
+.fp-chip[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent-text);
+}
+
+.fp-chip[aria-pressed='true'] svg,
+.fp-chip[aria-pressed='true'] .chip-count {
+  color: inherit;
+}
+
+.fp-find {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+}
+
+.fp-find:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.fp-find input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  outline: none;
+}
+
+.fp-find input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.fp-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 6px;
+  width: 100%;
+  margin-top: 6px;
+}
+
+.fp-tag {
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: 13.5px;
+}
+
+.fp-tag:hover {
+  background: var(--accent-soft);
+}
+
+.fp-tag[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.fp-foot {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* ---------- Results ---------- */
+
+.results-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  min-height: 36px;
+  padding: 12px 0;
+}
+
+.results-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.summary-spin {
+  flex: none;
+  color: var(--text-3, var(--text-2));
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  gap: 18px;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  /* After a long scroll there can be a thousand cards: the browser skips drawing the ones far off-screen. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 372px;
+  /* New cards (another filter, the next page) come in gently instead of popping. */
+  animation: fade-in 0.2s ease both;
+}
+
+.card:hover {
+  border-color: color-mix(in oklab, var(--hue) 45%, var(--line));
+  box-shadow: 0 18px 40px -20px color-mix(in oklab, var(--hue) 70%, transparent);
+  transform: translateY(-3px);
+}
+
+.card:has(.card-open:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.card-open {
+  /* When the arrow keys move here, the page stops scrolling just under the top bar and toolbar. */
+  scroll-margin: calc(var(--header-h) + var(--toolbar-h) + 12px) 0 12px;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border: 0;
+  background: transparent;
+  border-radius: inherit;
+}
+
+.card-open:focus-visible {
+  outline: none;
+}
+
+/* Goes straight to the website. It sits above the invisible "open details" button of its card or row. */
+.btn-open {
+  position: relative;
+  z-index: 2;
+  flex: none;
+  gap: 5px;
+  height: 30px;
+  padding: 0 11px;
+  border-radius: 8px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 13.5px;
+}
+
+.btn-open:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.price-pill {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12);
+}
+
+/* The picture sits in a frame ("mat") of its territory color, like a collected specimen. */
+.preview {
+  aspect-ratio: 2.3;
+  margin: 8px 8px 0;
+  padding: 6px;
+  border-radius: 12px;
+  background: var(--hue-soft, var(--surface-2));
+  overflow: hidden;
+}
+
+/* Hidden while it loads (the colored frame shows instead of an empty box), then it fades in, so nothing pops. */
+.preview-picture {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  border-radius: 7px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.preview-picture.is-shown {
+  opacity: 1;
+}
+
+/* A picture that turned out too small makes way for the band: it fades in too. */
+.preview-band > * {
+  animation: fade-in 0.25s ease both;
+}
+
+.preview-band {
+  display: grid;
+  place-items: center;
+  color: var(--hue-ink);
+  background-color: var(--hue-soft);
+  background-image: radial-gradient(color-mix(in oklab, var(--hue) 30%, transparent) 1.2px, transparent 1.5px);
+  background-size: 14px 14px;
+}
+
+.preview-tile {
+  display: grid;
+  place-items: center;
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.1);
+}
+
+.preview-tile img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.preview-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px 14px;
+  flex: 1;
+}
+
+.card-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.card-host {
+  font-size: 13px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+
+.card-title {
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.card-summary {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  color: var(--accent-text);
+}
+
+.card-tags .more {
+  color: var(--muted);
+}
+
+.card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.card-foot > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.card.is-working .card-title {
+  color: var(--text-2);
+}
+
+.grid.is-closest .card,
+.list.is-closest .row {
+  opacity: 0.8;
+}
+
+/* The last results, while the new ones load: a soft fade (after a short wait, so a quick answer doesn't blink). */
+.results-body {
+  transition: opacity 0.2s;
+}
+
+.results-body.is-stale {
+  opacity: 0.55;
+  transition-delay: 0.12s;
+}
+
+/* ---------- Selecting many links ---------- */
+
+/* The tick box in the corner of a card or row while selecting. */
+.select-box {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--on-accent);
+  pointer-events: none;
+}
+
+.row .select-box {
+  top: 50%;
+  left: 14px;
+  transform: translateY(-50%);
+}
+
+.row:has(.select-box) {
+  padding-left: 50px;
+}
+
+.is-selected .select-box {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.card.is-selected,
+.row.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.bulk-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 16px;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 10px 12px 10px 18px;
+  transform: translateX(-50%);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+
+.bulk-count {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0;
+  white-space: nowrap;
+}
+
+.bulk-actions,
+.bulk-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.bulk-form .input {
+  width: 230px;
+  height: 40px;
+}
+
+.bulk-confirm span {
+  font-weight: 600;
+  color: var(--danger);
+}
+
+.bulk-delete:hover:not(:disabled) {
+  background: var(--danger-soft);
+  border-color: transparent;
+  color: var(--danger);
+}
+
+.btn-ghost:disabled {
+  opacity: 0.5;
+}
+
+/* ---------- List view: one short row per link ---------- */
+
+.list {
+  display: grid;
+  gap: 8px;
+}
+
+.row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border-color 0.15s, box-shadow 0.15s;
+  content-visibility: auto;
+  contain-intrinsic-size: auto 84px;
+  animation: fade-in 0.2s ease both;
+}
+
+.row:hover {
+  border-color: color-mix(in oklab, var(--hue) 45%, var(--line));
+  box-shadow: 0 10px 28px -20px color-mix(in oklab, var(--hue) 70%, transparent);
+}
+
+.row:has(.card-open:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.row-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--hue-soft, var(--surface-2));
+  color: var(--hue-ink, var(--muted));
+}
+
+.row-icon img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.row-main {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.row-top {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+
+.row-title {
+  min-width: 0;
+  font-family: var(--display);
+  font-size: 16.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-host {
+  flex: none;
+  max-width: 40%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.row-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 1px;
+  overflow: hidden;
+  font-size: 13px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* In a row the category is colored words, not a pill: it keeps the row short. */
+.row-meta .badge,
+.row-meta .pill {
+  padding: 0;
+  background: none;
+  font-size: 13px;
+}
+
+.row-meta .warn,
+.row-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.row-stars {
+  color: var(--muted);
+}
+
+.row-tag {
+  color: var(--accent-text);
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.row-actions .star-btn {
+  margin: 0;
+}
+
+.row.is-working .row-title {
+  color: var(--text-2);
+}
+
+.skeleton-row .row-main {
+  gap: 8px;
+}
+
+.skeleton-row .skeleton-title {
+  width: 45%;
+}
+
+/* Grey placeholder shapes while cards load. */
+.skeleton {
+  display: block;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--line) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-card .preview {
+  padding: 0;
+}
+
+.skeleton-badge {
+  width: 90px;
+  height: 20px;
+  border-radius: 999px;
+}
+
+.skeleton-title {
+  width: 75%;
+  height: 18px;
+}
+
+.skeleton-text {
+  width: 100%;
+  height: 12px;
+}
+
+.skeleton-text.short {
+  width: 60%;
+}
+
+.skeleton-lines {
+  display: grid;
+  gap: 8px;
+  padding: 4px 0;
+}
+
+.skeleton-lines span {
+  height: 11px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--line) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite;
+}
+
+.skeleton-lines span:last-child {
+  width: 65%;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.sentinel {
+  height: 1px;
+}
+
+.end-note {
+  text-align: center;
+  color: var(--muted);
+  font-size: 14px;
+  margin: 28px 0 0;
+}
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 64px 16px;
+  color: var(--muted);
+}
+
+.empty h2 {
+  font-family: var(--display);
+  font-size: 24px;
+  color: var(--text);
+}
+
+.empty p {
+  margin: 0 0 8px;
+  max-width: 440px;
+  color: var(--text-2);
+}
+
+main.container {
+  padding-bottom: 64px;
+}
+
+/* Room for the selection bar, so it never covers the last links. */
+main.container:has(.bulk-bar) {
+  padding-bottom: 160px;
+}
+
+.to-top {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 15;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+/* ---------- Dialogs ---------- */
+
+dialog {
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding: 0;
+}
+
+dialog::backdrop {
+  background: var(--backdrop);
+}
+
+.modal {
+  width: min(620px, calc(100vw - 32px));
+  max-height: calc(100dvh - 48px);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+}
+
+.modal-inner {
+  padding: 22px 24px 24px;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.modal-head h2 {
+  font-family: var(--display);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.login-dialog {
+  width: min(420px, calc(100vw - 32px));
+}
+
+.login-form {
+  display: grid;
+  gap: 14px;
+}
+
+.login-form label,
+.edit-form label,
+.extras-grid label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 16px;
+}
+
+.tabs button {
+  border: 0;
+  background: none;
+  padding: 8px 14px 10px;
+  margin-bottom: -1px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.tabs button[aria-selected='true'] {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.links-input {
+  font-size: 14.5px;
+  min-height: 170px;
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 28px 16px;
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--muted);
+}
+
+.dropzone.is-dragging {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.dropzone p {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.dropzone strong {
+  color: var(--text);
+  font-size: 15.5px;
+}
+
+.extras {
+  margin-top: 14px;
+}
+
+.extras summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-2);
+  list-style: none;
+}
+
+.extras summary::-webkit-details-marker {
+  display: none;
+}
+
+.extras[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.extras-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.extras-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.form-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.found {
+  margin-right: auto;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* The links found before adding them */
+.found-list {
+  margin-top: 14px;
+}
+
+.found-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.found-list .progress-list {
+  max-height: 220px;
+}
+
+.found-list .progress-list li {
+  padding: 4px 6px 4px 12px;
+}
+
+.found-list .progress-name {
+  display: block;
+}
+
+.icon-btn-sm {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.progress-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0 0 12px;
+  color: var(--text-2);
+}
+
+.bar {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.bar span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: inherit;
+  transition: width 0.4s;
+}
+
+.progress-count {
+  margin: 8px 0 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.progress-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.progress-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.progress-list li:last-child {
+  border-bottom: 0;
+}
+
+.progress-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.progress-state {
+  flex: none;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.progress-state.warn {
+  color: var(--warning);
+}
+
+.progress-state.bad {
+  color: var(--danger);
+}
+
+.ok {
+  color: var(--success);
+}
+
+.bad {
+  color: var(--danger);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.accent {
+  color: var(--accent-text);
+}
+
+/* ---------- Detail panel ---------- */
+
+.drawer {
+  margin: 0 0 0 auto;
+  width: min(520px, 100vw);
+  height: 100dvh;
+  max-height: 100dvh;
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+  overflow-y: auto;
+}
+
+.drawer[open] {
+  animation: slide-in 0.22s ease-out;
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(40px);
+    opacity: 0;
+  }
+}
+
+.drawer-inner {
+  position: relative;
+}
+
+.drawer-top {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  justify-content: flex-end;
+  height: 0;
+}
+
+.drawer-nav {
+  display: flex;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.drawer-top .drawer-nav .icon-btn {
+  margin: 12px 0 0;
+}
+
+.drawer-top .icon-btn:disabled {
+  opacity: 1;
+  color: var(--line-strong);
+}
+
+.drawer-top .icon-btn {
+  margin: 12px 12px 0 0;
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.drawer-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 80px 28px;
+  color: var(--muted);
+}
+
+.preview-big {
+  aspect-ratio: 2.4;
+  margin: 12px 12px 0;
+}
+
+.drawer-body {
+  padding: 20px 26px 40px;
+}
+
+.drawer-title {
+  margin-top: 12px;
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.drawer-url {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 14px;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.drawer-url span {
+  color: var(--muted);
+}
+
+.drawer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 6px;
+}
+
+.drawer-summary {
+  margin: 18px 0 0;
+  font-size: 16px;
+  line-height: 1.6;
+}
+
+.drawer-use {
+  margin: 10px 0 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 500;
+}
+
+.hint-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+
+.drawer-section {
+  margin-top: 26px;
+}
+
+.drawer-section h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.features {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.features li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.features svg {
+  color: var(--success);
+  margin-top: 3px;
+  flex: none;
+}
+
+.note {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--accent);
+  color: var(--text-2);
+  white-space: pre-line; /* notes imported from a spreadsheet keep one line per detail */
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-list button {
+  background: var(--accent-soft);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 8px 12px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.facts dt {
+  color: var(--muted);
+}
+
+.facts dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.similar {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.similar button {
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  text-align: left;
+}
+
+.similar button:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.similar strong {
+  font-size: 15px;
+}
+
+.similar span:last-child {
+  font-size: 13.5px;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+}
+
+.confirm p {
+  margin: 0;
+  font-weight: 600;
+}
+
+.confirm div {
+  display: flex;
+  gap: 8px;
+}
+
+.edit-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+/* A dropdown used as a form field (the category in the edit form): full width, like the boxes around it. */
+.field-label {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.dropdown-field .tool-btn {
+  width: 100%;
+  height: 42px;
+  justify-content: flex-start;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.dropdown-field .tool-label {
+  flex: 1;
+  text-align: left;
+}
+
+.dropdown-field .popover {
+  right: auto;
+  left: 0;
+  width: 100%;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+/* Important links, the website's headings and the facts: folded, because you rarely need them. */
+.more-details {
+  margin-top: 26px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.more-details summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text-2);
+  list-style: none;
+}
+
+.more-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.more-details[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.more-details > .drawer-section:first-of-type {
+  margin-top: 16px;
+}
+
+/* ---------- Private library ---------- */
+
+.gate {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  max-width: 360px;
+  margin: 18vh auto 0;
+  padding: 0 24px;
+  text-align: center;
+}
+
+.gate h1 {
+  font-size: 24px;
+}
+
+.gate p {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  color: var(--muted);
+}
+
+.gate .login-form {
+  width: 100%;
+  text-align: left;
+}
+
+/* ---------- Toasts ---------- */
+
+.toasts {
+  position: fixed;
+  left: 50%;
+  bottom: 24px;
+  transform: translateX(-50%);
+  z-index: 50;
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 14.5px;
+  font-weight: 500;
+  box-shadow: var(--shadow);
+}
+
+.toast-error {
+  background: var(--danger);
+  color: var(--surface);
+}
+
+/* ---------- Search results: best matches, then related ---------- */
+
+mark {
+  background: color-mix(in oklab, var(--accent) 16%, transparent);
+  color: var(--text);
+  font-weight: 650;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+.spelling {
+  margin: -6px 0 14px;
+  color: var(--text-2);
+}
+
+.link-btn {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--accent-text);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.result-group + .result-group,
+.result-group + .grid {
+  margin-top: 34px;
+}
+
+.group-title {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 12px;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+.show-more {
+  display: flex;
+  width: 100%;
+  margin-top: 12px;
+  height: 44px;
+  color: var(--text-2);
+}
+
+.group-hint {
+  margin: -6px 0 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.card-snippet {
+  -webkit-line-clamp: 3;
+}
+
+/* ---------- Favorites and your status ---------- */
+
+.star-btn {
+  position: relative;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: -4px -6px -4px 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  flex: none;
+}
+
+button.star-btn:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.star-btn.is-on {
+  color: #e8a200;
+}
+
+.star-btn.is-on svg {
+  fill: currentColor;
+}
+
+.drawer-actions .star-btn {
+  width: 38px;
+  height: 38px;
+  margin: 0;
+}
+
+.pill-status {
+  background: color-mix(in oklab, var(--success) 14%, var(--surface));
+  color: var(--success);
+}
+
+.my-status {
+  margin-bottom: 6px;
+}
+
+.rename-tag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.rename-tag .input {
+  width: 200px;
+  height: 36px;
+  padding: 6px 10px;
+}
+
+.rename-tag .btn {
+  height: 36px;
+}
+
+/* ---------- Details panel: what the robot collected ---------- */
+
+.drawer-match {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.drawer-match svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.tasks {
+  display: grid;
+  gap: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.tasks li {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-weight: 500;
+}
+
+.tasks svg {
+  color: var(--accent);
+  margin-top: 4px;
+  flex: none;
+}
+
+.overview,
+.audience {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.audience {
+  margin-top: 10px;
+}
+
+.audience strong {
+  color: var(--text);
+}
+
+.steps {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.steps li {
+  position: relative;
+  min-height: 24px;
+  padding-left: 36px;
+  counter-increment: step;
+}
+
+.steps li::before {
+  content: counter(step);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.page-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.page-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.page-links a:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.page-links svg {
+  color: var(--muted);
+}
+
+.headings {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 8px;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: 14.5px;
+}
+
+.headings li::marker {
+  color: var(--line-strong);
+}
+
+.pages-read {
+  gap: 4px 12px;
+}
+
+.pages-read a {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  text-decoration: none;
+}
+
+.muted-words {
+  color: var(--muted);
+}
+
+/* ---------- Adding: bookmark folders and the save button ---------- */
+
+.folders-found {
+  margin: 12px 0 0;
+}
+
+.save-button-dialog .steps {
+  margin: 18px 0;
+}
+
+.bookmarklet {
+  display: flex;
+  width: max-content;
+  margin: 10px 0 0;
+  cursor: grab;
+}
+
+.save-page {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: 18px 20px 28px;
+}
+
+.save-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 26px;
+  font-family: var(--display);
+  font-size: 17px;
+}
+
+.save-result {
+  display: grid;
+  gap: 12px;
+}
+
+.save-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.save-title {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  overflow-wrap: anywhere;
+}
+
+.save-result .card-summary {
+  -webkit-line-clamp: 5;
+}
+
+/* ---------- Phones ---------- */
+
+@media (max-width: 960px) {
+  .page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: none;
+    grid-template-areas:
+      'hero'
+      'map'
+      'browse';
+  }
+
+  .hero {
+    margin-bottom: 14px;
+  }
+
+  .map-frame {
+    aspect-ratio: 1000 / 520;
+  }
+
+  .map figcaption {
+    position: static;
+    margin-top: 8px;
+    padding: 0;
+    background: none;
+    text-align: center;
+  }
+
+  /* With the small search box in the top bar, the logo alone is enough. */
+  .has-search .brand-text {
+    display: none;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --header-h: 60px;
+  }
+
+  .container {
+    padding: 0 16px;
+  }
+
+  .hero-title {
+    font-size: 26px;
+    margin-bottom: 14px;
+  }
+
+  .header-row {
+    gap: 10px;
+  }
+
+  .brand-count {
+    display: none;
+  }
+
+  /* Long names wrap onto a second line instead of being cut off. */
+  .brand h1 {
+    font-size: 16.5px;
+    line-height: 1.12;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .theme-switch {
+    display: none;
+  }
+
+  .theme-cycle {
+    display: inline-grid;
+  }
+
+  /* Small search box in the top bar: it gets the whole row except the menu and the Add button. */
+  .has-search .brand,
+  .has-search .theme-cycle,
+  .has-search .btn-add .show-small {
+    display: none;
+  }
+
+  .has-search .header-actions .btn-add {
+    padding: 0 11px;
+  }
+
+  .search-compact .search-box input {
+    font-size: 16px;
+  }
+
+  .hide-small {
+    display: none;
+  }
+
+  .show-small {
+    display: inline;
+  }
+
+  .header-actions {
+    gap: 6px;
+  }
+
+  .header-actions .btn {
+    padding: 0 12px;
+  }
+
+  .segmented button {
+    min-width: 30px;
+    padding: 0 6px;
+  }
+
+  .page {
+    padding-top: 12px;
+  }
+
+  .map-frame {
+    border-radius: 18px;
+  }
+
+  /* Small screens: link names only show for the dots that match a search. */
+  .map:not(.is-narrowed) .map-label.is-name,
+  .map-label.is-name.is-dim {
+    display: none;
+  }
+
+  .search-box {
+    height: 54px;
+    padding-left: 14px;
+  }
+
+  .search-box input {
+    font-size: 16px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
+  .bulk-bar {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    width: auto;
+    max-width: none;
+    transform: none;
+    padding: 10px 12px;
+  }
+
+  /* Phones: the count and Done on top, the four actions in one row of small buttons under them. */
+  .bulk-count {
+    flex: 1;
+  }
+
+  .bulk-done {
+    order: 1;
+    height: 36px;
+  }
+
+  .bulk-actions,
+  .bulk-form {
+    order: 2;
+    flex-basis: 100%;
+  }
+
+  .bulk-actions {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .bulk-actions .btn {
+    flex-direction: column;
+    gap: 2px;
+    height: 50px;
+    padding: 0 4px;
+    font-size: 12px;
+  }
+
+  .bulk-form .btn {
+    padding: 0 12px;
+  }
+
+  .bulk-form .input {
+    width: auto;
+    flex: 1 1 140px;
+  }
+
+  /* The toolbar: categories on top, the buttons under them. It scrolls with the page here, so it
+     doesn't take a slice of a small screen. */
+  :root {
+    --toolbar-h: 0px;
+  }
+
+  .toolbar-wrap {
+    position: static;
+    margin: 0;
+    padding: 0;
+  }
+
+  .toolbar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .cat-tabs {
+    flex-basis: 100%;
+  }
+
+  .toolbar-tools {
+    width: 100%;
+    padding: 6px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .toolbar-tools > .dropdown {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .toolbar-tools > .dropdown > .tool-btn {
+    width: 100%;
+    padding: 0 10px;
+  }
+
+  /* Buttons with only an icon get square. The Sort button drops its icon to make room for its words. */
+  .toolbar-tools > .tool-btn {
+    padding: 0;
+  }
+
+  .toolbar-tools .dropdown:not(.filters-drop) .tool-icon {
+    display: none;
+  }
+
+  .toolbar .view-switch {
+    display: none;
+  }
+
+  .view-cycle {
+    display: inline-flex;
+  }
+
+  /* Menus and the Filters panel slide up from the bottom of the screen, with the page dimmed behind. */
+  .sheet-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    display: block;
+    background: var(--backdrop);
+    animation: fade-in 0.15s ease-out;
+  }
+
+  .popover {
+    position: fixed;
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 61;
+    width: auto;
+    min-width: 0;
+    max-height: 85dvh;
+    overflow-y: auto;
+    padding: 6px 10px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 20px 20px 0 0;
+    animation: sheet-in 0.22s ease-out;
+  }
+
+  .sheet-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 2px 6px 8px;
+    font-family: var(--display);
+    font-size: 17px;
+    font-weight: 700;
+  }
+
+  .menu-option {
+    min-height: 48px;
+    font-size: 15.5px;
+  }
+
+  .filters-pop {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: 6px 0 0;
+  }
+
+  .filters-pop .sheet-head {
+    padding: 4px 10px 6px 18px;
+  }
+
+  .filters-panel {
+    min-height: 0;
+    max-height: none;
+  }
+
+  .fp-foot {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+  }
+
+  .fp-foot .btn {
+    flex: 1;
+  }
+
+
+  /* Rows: the title and text get two lines, the Open button is just its arrow. */
+  .row {
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .row-icon {
+    width: 36px;
+    height: 36px;
+  }
+
+  .row-top {
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .row-title {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    font-size: 16px;
+  }
+
+  .row-host {
+    max-width: 100%;
+  }
+
+  .row-text {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .row-actions {
+    flex-direction: column-reverse;
+    gap: 4px;
+  }
+
+  .row .btn-open {
+    width: 34px;
+    padding: 0;
+    font-size: 0;
+    gap: 0;
+  }
+
+  .results-summary {
+    font-size: 14.5px;
+  }
+
+  .extras-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-inner {
+    padding: 18px 18px 20px;
+  }
+
+  .drawer-body {
+    padding: 18px 18px 36px;
+  }
+
+  .form-actions {
+    flex-wrap: wrap;
+  }
+
+  .found {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .spin {
+    animation: none !important;
+  }
+}

@@ -1,0 +1,36 @@
+# Render "Blueprint": tells Render how to run the library for free.
+# Render reads this file when you click "New → Blueprint" or the "Deploy to Render" button in the README.
+services:
+  - type: web
+    name: knowledge-library
+    runtime: node
+    plan: free
+    # Put the server where your Neon database is (Neon's "US East 2" is Ohio): every search asks the database
+    # a few questions, and from the same place each one takes about a millisecond instead of a tenth of a second.
+    region: ohio
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: "24"
+      - key: LIBRARY_TITLE
+        value: Knowledge Library
+      # true = only you (after logging in) can see the library. Set it to false to let anyone look (only you can edit).
+      - key: PRIVATE_LIBRARY
+        value: "true"
+      # A long random secret that keeps logins safe. Render makes one for you.
+      - key: SESSION_SECRET
+        generateValue: true
+      # Render asks you for these when you create the service:
+      - key: DATABASE_URL # your Neon connection link
+        sync: false
+      - key: GROQ_API_KEY # your free Groq key
+        sync: false
+      - key: ADMIN_PASSWORD # the password you'll use to add links
+        sync: false
+      - key: GITHUB_TOKEN # optional: a free GitHub token for star counts
+        sync: false

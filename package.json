@@ -1,0 +1,35 @@
+{
+  "name": "knowledge-library",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Your own AI-powered library for useful links: find anything you saved by saying what you want to do.",
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env server/index.js --dev",
+    "build": "vite build web && node --env-file-if-exists=.env server/scripts/prefetch-model.js",
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "seed": "node --env-file-if-exists=.env server/scripts/seed.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@electric-sql/pglite": "0.5.11",
+    "@electric-sql/pglite-pgvector": "0.0.12",
+    "@huggingface/transformers": "3.8.1",
+    "cheerio": "1.2.0",
+    "compression": "1.8.2",
+    "express": "5.3.0",
+    "pg": "8.23.1"
+  },
+  "devDependencies": {
+    "@fontsource-variable/bricolage-grotesque": "5.3.0",
+    "@fontsource-variable/figtree": "5.3.0",
+    "@tanstack/react-query": "5.105.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "lucide-react": "1.61.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
+    "vite": "8.3.5"
+  }
+}
