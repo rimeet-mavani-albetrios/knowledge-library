@@ -1,0 +1,677 @@
+/* "Pick links to compare" (ComparePicker.jsx, ComparePickerParts.jsx): the search and its list on the left, your
+   picks on the right. Phones: the window fills the screen and your picks are a bar at the bottom (end of file).
+   Also the badge on the toolbar's Compare button, which opens it. */
+
+.compare-btn .filters-badge {
+  margin-left: 2px;
+}
+
+/* ---------- The window ---------- */
+
+/* A fixed height, so the window doesn't grow and shrink as results come and go. (2px less than the window's
+   own limit, for its border.) */
+.modal.picker-dialog {
+  width: min(960px, calc(100vw - 48px));
+  overflow: hidden;
+}
+
+.picker-dialog .modal-inner {
+  display: flex;
+  flex-direction: column;
+  height: min(720px, calc(100dvh - 50px));
+}
+
+.picker-body {
+  display: grid;
+  flex: 1;
+  grid-template-columns: minmax(0, 1fr) 290px;
+  gap: 20px;
+  min-height: 0;
+}
+
+.picker-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ---------- The search box ---------- */
+
+.picker-find {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 10px;
+  height: 46px;
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.picker-find:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.picker-find input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  outline: none;
+}
+
+.picker-find input::placeholder {
+  color: var(--muted);
+}
+
+.picker-find-spin {
+  flex: none;
+  color: var(--muted);
+}
+
+/* Nothing on its right (no spinner, no ×): the text keeps a little room from the edge. */
+.picker-find input:last-child {
+  margin-right: 8px;
+}
+
+.picker-find-clear {
+  color: var(--muted);
+}
+
+/* ---------- The list under it ---------- */
+
+.picker-list {
+  flex: 1;
+  min-height: 0;
+  margin-top: 10px;
+  padding-bottom: 12px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.picker-section + .picker-section {
+  margin-top: 8px;
+}
+
+/* Stays at the top while its rows scroll under it. */
+.picker-heading {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 8px 10px 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.picker-results {
+  transition: opacity 0.15s;
+}
+
+/* An older search's links while the new one loads. */
+.picker-results.is-faded {
+  opacity: 0.55;
+}
+
+.picker-status,
+.picker-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.picker-status {
+  padding: 28px 12px 12px;
+}
+
+/* Kept in the page while empty (a screen reader listens to it), just without room. */
+.picker-status:empty {
+  padding: 0;
+}
+
+.picker-hint {
+  padding: 40px 12px;
+  color: var(--text-2);
+}
+
+.picker-hint span {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.picker-more {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 4px 0 0;
+  padding: 8px 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* ---------- A link's row ---------- */
+
+.picker-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 58px;
+  padding: 8px 12px 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  /* When the arrow keys bring a row into view, it stops under the sticky heading, not behind it. */
+  scroll-margin: 36px 0 8px;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+.picker-row + .picker-row {
+  margin-top: 2px;
+}
+
+/* A grey row holding a place while similar links load (same size as a real one). */
+.picker-row.is-skeleton .picker-text {
+  gap: 7px;
+}
+
+.picker-row.is-skeleton .skeleton-text {
+  width: 46%;
+}
+
+.picker-row.is-skeleton .skeleton-text.short {
+  width: 28%;
+}
+
+.picker-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  background: var(--surface-2);
+}
+
+.picker-row.is-on {
+  border-color: color-mix(in oklab, var(--accent) 30%, transparent);
+  background: var(--accent-soft);
+}
+
+/* 4 are picked: the others can't be ticked. (No message: the "4 is the most" line under your picks says why.) */
+.picker-row.is-locked {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.picker-row .picker-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+}
+
+.picker-row .picker-icon img {
+  width: 20px;
+  height: 20px;
+}
+
+.picker-text {
+  display: grid;
+  flex: 1;
+  gap: 1px;
+  min-width: 0;
+}
+
+.picker-name {
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.picker-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+/* "Design · figma.com · Free plan": the category in its own color, small dots in between. */
+.picker-meta > * + *::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--muted);
+}
+
+.picker-cat {
+  flex: none;
+  color: var(--hue-ink, var(--text-2));
+  font-weight: 600;
+}
+
+.picker-site {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.picker-price {
+  flex: none;
+}
+
+/* The tick box at the right. */
+.picker-box {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--line-strong);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--on-accent);
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+.picker-row.is-on .picker-box {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.picker-row.is-locked .picker-box {
+  border-style: dashed;
+}
+
+/* ---------- A recent comparison ---------- */
+
+/* The links' icons, overlapping a little, like a small stack of cards. */
+.picker-recent-icons {
+  display: flex;
+  flex: none;
+  width: 92px;
+}
+
+.picker-recent-icon {
+  display: grid;
+  flex: none;
+  border-radius: 9px;
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+.picker-recent-icon + .picker-recent-icon {
+  margin-left: -9px;
+}
+
+.picker-recent-icon .row-icon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.picker-recent-icon .row-icon img {
+  width: 18px;
+  height: 18px;
+}
+
+.picker-recent-icon .row-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.picker-recent-go {
+  flex: none;
+  color: var(--muted);
+}
+
+/* ---------- Your picks ---------- */
+
+.picker-picks {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-self: start;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--surface-2);
+}
+
+.picker-picks-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.picker-picks-title {
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 650;
+}
+
+.picker-picks-count {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.picker-clear {
+  margin-left: auto;
+  padding: 2px 6px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.picker-slots {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* A pick: icon, its whole name (up to 2 lines) and ×. */
+.picker-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 8px 6px 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--hue, transparent);
+  animation: picker-slot-in 0.16s ease-out;
+}
+
+@keyframes picker-slot-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+.picker-slot.is-empty {
+  justify-content: center;
+  border: 1.5px dashed var(--line-strong);
+  background: transparent;
+  box-shadow: none;
+  animation: none;
+}
+
+.picker-slot-empty {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.picker-slot .picker-slot-icon {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.picker-slot .picker-slot-icon img {
+  width: 19px;
+  height: 19px;
+}
+
+.picker-slot-name {
+  display: -webkit-box;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.picker-slot-skeleton {
+  width: 70%;
+  height: 12px;
+}
+
+.picker-slot-x {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.picker-note {
+  min-height: 19px;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13px;
+  text-align: center;
+}
+
+.picker-picks .picker-go {
+  width: 100%;
+  height: 46px;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 6px 16px -8px color-mix(in oklab, var(--accent) 80%, transparent);
+}
+
+.picker-picks .picker-go:disabled {
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* ---------- Mouse only ---------- */
+
+@media (hover: hover) {
+  .picker-row:not(.is-locked):not(.is-on):hover {
+    background: var(--surface-2);
+  }
+
+  .picker-row.is-on:hover {
+    border-color: color-mix(in oklab, var(--accent) 50%, transparent);
+  }
+
+  .picker-row:not(.is-locked):hover .picker-box {
+    border-color: var(--accent);
+  }
+
+  .picker-recent:hover .picker-recent-go {
+    color: var(--text);
+  }
+
+  .picker-clear:hover {
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .picker-slot-x:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+}
+
+/* Small laptops and tablets: a narrower picks column. */
+@media (max-width: 860px) {
+  .picker-body {
+    grid-template-columns: minmax(0, 1fr) 240px;
+    gap: 14px;
+  }
+}
+
+/* ---------- Phones: the whole screen, with your picks as a bar at the bottom ---------- */
+
+@media (max-width: 640px) {
+  .modal.picker-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .picker-dialog .modal-inner {
+    height: 100dvh;
+    max-height: 100dvh;
+    padding: 16px 12px 0;
+  }
+
+  .picker-dialog .modal-head {
+    margin-bottom: 10px;
+  }
+
+  .picker-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .picker-main {
+    flex: 1;
+  }
+
+  .picker-find input {
+    font-size: 16px; /* smaller text makes iPhones zoom in */
+  }
+
+  .picker-row {
+    min-height: 60px;
+    padding: 8px 8px 8px 6px;
+  }
+
+  /* The bar: the 4 picks in a line (icon with the name under it), then the count, Clear and the button. */
+  .picker-picks {
+    display: grid;
+    flex: none;
+    grid-template-areas:
+      'slots slots'
+      'head go';
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    align-self: stretch;
+    gap: 10px 12px;
+    margin: 0 -12px;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--line);
+    border-radius: 0;
+    background: var(--surface);
+    box-shadow: 0 -10px 24px -18px rgb(20 24 43 / 0.35);
+  }
+
+  .picker-picks-head {
+    grid-area: head;
+    align-items: center;
+  }
+
+  .picker-picks-title,
+  .picker-note {
+    display: none;
+  }
+
+  .picker-clear {
+    margin-left: 0;
+  }
+
+  .picker-slots {
+    grid-area: slots;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .picker-slot,
+  .picker-slot.is-empty {
+    position: relative;
+    flex-direction: column;
+    justify-content: center;
+    gap: 4px;
+    min-height: 0;
+    height: 60px;
+    padding: 6px 6px 5px;
+  }
+
+  .picker-slot {
+    box-shadow: inset 0 3px 0 var(--hue, transparent);
+  }
+
+  .picker-slot .picker-slot-icon {
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+  }
+
+  .picker-slot .picker-slot-icon img {
+    width: 16px;
+    height: 16px;
+  }
+
+  .picker-slot-name {
+    flex: none;
+    max-width: 100%;
+    font-size: 11.5px;
+    line-height: 1.25;
+    text-align: center;
+    -webkit-line-clamp: 1;
+  }
+
+  .picker-slot-empty {
+    display: none;
+  }
+
+  /* A small × on the corner of each pick. Its touch area is bigger than it looks. */
+  .picker-slot-x {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--line-strong);
+    border-radius: 50%;
+    background: var(--surface);
+  }
+
+  .picker-slot-x::after {
+    content: '';
+    position: absolute;
+    inset: -8px;
+  }
+
+  .picker-picks .picker-go {
+    grid-area: go;
+    height: 46px;
+  }
+}

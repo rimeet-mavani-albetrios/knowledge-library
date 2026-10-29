@@ -23,6 +23,12 @@
   animation: detail-fade 0.18s ease-out;
 }
 
+/* Coming straight from the compare window: no fade, so nothing flashes in between. */
+.detail.is-instant[open],
+.detail.is-instant[open]::backdrop {
+  animation: none;
+}
+
 @keyframes detail-in {
   from {
     opacity: 0;
@@ -965,5 +971,100 @@
 
   .detail-skeleton span {
     animation: none;
+  }
+}
+
+/* ---------- Compare (the button in the actions row and the "Similar" list) ---------- */
+
+.detail-compare {
+  gap: 6px;
+  height: 38px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
+.detail-compare.is-on {
+  border-color: color-mix(in oklab, var(--accent) 40%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.detail-compare.is-full {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.detail-section-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.detail-section-head h3 {
+  margin: 0;
+}
+
+.detail-compare-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.detail-similar li {
+  position: relative;
+}
+
+/* Room on the right of each row for its compare button, just before the arrow. */
+.detail-similar .detail-similar-text {
+  padding-right: 34px;
+}
+
+.detail-similar .detail-similar-compare {
+  position: absolute;
+  top: 50%;
+  right: 34px;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+
+.detail-similar-compare:focus-visible,
+.detail-compare-all:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+@media (hover: hover) {
+  .detail-compare:not(.is-full):hover {
+    border-color: color-mix(in oklab, var(--accent) 40%, var(--line));
+    color: var(--accent-text);
+  }
+
+  .detail-compare-all:hover {
+    background: var(--accent-soft);
+  }
+
+  .detail-similar .detail-similar-compare:hover {
+    border-color: color-mix(in oklab, var(--accent) 35%, var(--line));
+    background: var(--accent-soft);
+    color: var(--accent-text);
   }
 }

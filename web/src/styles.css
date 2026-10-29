@@ -600,8 +600,33 @@ kbd {
   transition: opacity 0.25s;
 }
 
-.map.is-settled .map-dot {
+.map.is-settled .map-dot,
+.map.is-settled .map-territory {
   animation: none;
+}
+
+/* All the dots of one category: they fade in one territory after the other when the map first appears. */
+.map-territory {
+  animation: territory-in 0.6s ease-out both;
+}
+
+@keyframes territory-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The halos of a whole territory are one shape, so they don't add up where dots crowd: a touch stronger. */
+.map-territory .map-halo {
+  opacity: 0.15;
+}
+
+[data-theme='dark'] .map-territory .map-halo {
+  opacity: 0.24;
+}
+
+.map svg.is-pointing {
+  cursor: pointer;
 }
 
 .map-core {
@@ -958,13 +983,13 @@ kbd {
   font-weight: 700;
 }
 
-/* The thin row of chips under the toolbar: it's part of the sticky block, so it stays while you scroll. */
+/* The thin row of chips at the top of the folder: it's part of the sticky block, so it stays while you scroll. */
 .active-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 6px 8px;
-  padding: 8px 8px 2px;
+  padding-bottom: 4px;
   font-size: 14px;
 }
 
@@ -1067,38 +1092,42 @@ kbd {
   }
 }
 
-/* ---------- Toolbar: categories, Filters, Sort, Map, Select, cards / compact / list ---------- */
-/* On big screens it sticks under the top bar while you scroll the results. */
+/* ---------- Toolbar: the folder of links, its category tabs, and Filters, Sort, Map, Select, Compare, views ---------- */
+/* The links sit in an open folder: the categories are tabs on its top edge and the results are its body. The chosen
+   tab is the front one, in the body's color and joined to it. The tools sit at the right, on the same line as the tabs.
+   On big screens the tabs and tools (and the top of the folder) stick under the top bar while you scroll the results. */
 
 :root {
   --toolbar-h: 64px; /* the sticky toolbar's height, so scrolling stops just under it (measured by Toolbar.jsx) */
+  --folder: var(--surface-2); /* the folder's body and its front tab: a step darker than the page, so cards stand out */
+}
+
+:root[data-theme='dark'] {
+  --folder: #13172a; /* between the page and the cards, so the cards are still the lightest thing */
 }
 
 .browse {
-  padding-top: 14px;
+  padding-top: 8px;
 }
 
 .toolbar-wrap {
   position: sticky;
   top: var(--header-h);
   z-index: 16;
-  margin: 0 -10px;
-  padding: 6px 10px;
+  padding-top: 6px;
 }
 
+/* Stuck: a solid background around the tabs, so links don't show through as they scroll under. */
 .toolbar-wrap.is-stuck {
   background: var(--bg);
-  box-shadow: 0 1px 0 var(--line);
 }
 
+/* The line of tabs and tools, standing on the folder's top edge. */
 .toolbar {
+  position: relative; /* the "more" window hangs under this line (see .cat-pop) */
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px;
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 14px;
+  align-items: flex-end;
+  gap: 16px;
 }
 
 .toolbar-tools {
@@ -1106,8 +1135,7 @@ kbd {
   flex: none;
   align-items: center;
   gap: 6px;
-  padding-left: 8px;
-  border-left: 1px solid var(--line);
+  padding-bottom: 6px; /* a little air between the buttons and the folder's edge */
 }
 
 .toolbar .segmented button {
@@ -1115,65 +1143,29 @@ kbd {
   min-width: 32px;
 }
 
-/* Categories: "All" pinned at the left, a row that slides sideways (the ‹ › buttons and a fade show there's
-   more), and "All categories" at the right, which opens them all as a grid. */
-.cat-tabs {
-  position: relative; /* the "All categories" window hangs under this whole area, so it never runs off the screen */
+/* The tabs take the room the tools leave; Toolbar.jsx shows as many as fit in it. */
+.folder-tabs {
   display: flex;
-  flex: 1;
-  align-items: center;
+  flex: 1 1 0;
+  align-items: flex-end;
   gap: 4px;
   min-width: 0;
+  overflow-x: clip; /* while the window is being resized, a tab that no longer fits is cut off for a moment */
 }
 
-.cat-all {
-  flex: none;
-}
-
-.cat-scroll {
-  position: relative;
-  display: flex;
-  flex: 1;
-  min-width: 0;
-}
-
-.cat-row {
-  position: relative; /* so a tab's position is measured from the row (Toolbar.jsx slides the chosen one into view) */
-  display: flex;
-  gap: 2px;
-  min-width: 0;
-  width: 100%;
-  overflow-x: auto;
-  scrollbar-width: none;
-}
-
-.cat-row::-webkit-scrollbar {
-  display: none;
-}
-
-.cat-scroll.more-right .cat-row {
-  mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
-}
-
-.cat-scroll.more-left .cat-row {
-  mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent);
-}
-
-.cat-scroll.more-left.more-right .cat-row {
-  mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
-}
-
-.cat-tab {
+/* A tab at the back: a soft shape a shade off the folder's color, a little lower than the front one, with quieter words. */
+.folder-tab {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   height: 36px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--text-2);
+  padding: 0 15px;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  background: color-mix(in oklab, var(--folder) 80%, var(--line));
+  color: var(--muted);
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
@@ -1181,138 +1173,137 @@ kbd {
 }
 
 @media (hover: hover) {
-  .cat-tab:hover {
-    background: var(--surface-2);
+  .folder-tab:hover {
+    background: color-mix(in oklab, var(--folder) 55%, var(--line));
     color: var(--text);
   }
 }
 
+.folder-tab:focus-visible {
+  outline-offset: -2px;
+}
+
+/* No links in this category for the current search or filters: it stays in its place, faded. */
+.folder-tab.is-empty,
+.cat-item.is-empty {
+  opacity: 0.45;
+}
+
+/* The front tab: the body's color, with no line between them (it covers the folder's edge under it), bolder
+   words, and its category's color along the top ("All links" uses the accent color). */
+.folder-tab[aria-pressed='true'] {
+  position: relative;
+  z-index: 1;
+  height: 41px;
+  margin-bottom: -1px;
+  border-color: var(--line);
+  border-top-color: var(--hue, var(--accent));
+  background: var(--folder);
+  box-shadow: inset 0 2px var(--hue, var(--accent));
+  color: var(--text);
+  font-weight: 650;
+  cursor: default;
+}
+
 /* The color dot matches the category's dots on the map. */
-.cat-tab.has-hue::before {
-  content: '';
+.folder-dot {
+  flex: none;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--hue);
 }
 
-.cat-tab[aria-pressed='true'] {
-  background: var(--text);
-  color: var(--bg);
-}
-
-.cat-tab.has-hue[aria-pressed='true'] {
-  background: var(--hue-soft);
-  color: var(--hue-ink);
-  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--hue) 45%, transparent);
-}
-
-.cat-count {
-  font-size: 11.5px;
-  font-weight: 500;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.cat-tab[aria-pressed='true'] .cat-count {
-  color: inherit;
-  opacity: 0.7;
-}
-
-/* A tab and, when it's the chosen one, its small ×, which takes you back to All. */
-.cat-pick {
-  position: relative;
+/* The name keeps room for its bold self, so a tab doesn't get wider (and push the others) when it's chosen. */
+.folder-name {
   display: inline-flex;
-  flex: none;
+  flex-direction: column;
 }
 
-.cat-pick.is-on .cat-tab {
-  padding-right: 32px;
+.folder-name::after {
+  content: attr(data-label);
+  content: attr(data-label) / '';
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  font-weight: 650;
 }
 
-.cat-x {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  transform: translateY(-50%);
-  border: 0;
-  border-radius: 7px;
-  background: color-mix(in oklab, var(--hue) 18%, transparent);
-  color: var(--hue-ink);
-  transition: background-color 0.15s;
+/* "N more": words and an arrow rather than a tab shape, since it opens a window instead of a category. */
+.folder-more {
+  gap: 6px;
+  padding-right: 12px;
+  background: transparent;
+  color: var(--text-2);
 }
 
-@media (hover: hover) {
-  .cat-x:hover {
-    background: var(--hue-ink);
-    color: var(--surface);
-  }
-}
-
-.cat-arrow {
-  position: absolute;
-  top: 50%;
-  z-index: 1;
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  transform: translateY(-50%);
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--surface);
+.folder-more.is-open {
+  background: color-mix(in oklab, var(--folder) 55%, var(--line));
   color: var(--text);
-  box-shadow: var(--shadow);
 }
 
-@media (hover: hover) {
-  .cat-arrow:hover {
-    border-color: var(--line-strong);
-  }
+.folder-chevron {
+  flex: none;
+  color: var(--muted);
+  transition: transform 0.15s;
 }
 
-.cat-arrow.left {
-  left: 0;
+.folder-more.is-open .folder-chevron {
+  transform: rotate(180deg);
 }
 
-.cat-arrow.right {
-  right: 0;
-}
-
-.cat-arrow[hidden] {
-  display: none;
-}
-
-/* Touch screens slide the row with a finger. */
-@media (hover: none) {
-  .cat-arrow {
-    display: none;
-  }
-}
-
-/* "All categories": the button and its window, a grid of every category with a find box on top.
-   (The window's place is measured from .cat-tabs, not from this small wrapper: see .cat-pop.) */
-.cat-tabs .cat-picker {
+/* The window's place is measured from the tab line, not from this small wrapper (see .cat-pop). */
+.folder-tabs > .cat-picker {
   position: static;
   flex: none;
 }
 
-.cat-picker-btn {
-  border-color: transparent;
-  color: var(--text-2);
+/* A hidden copy of every tab, for measuring how wide each one is (Toolbar.jsx). It takes no room on the page. */
+.folder-ruler {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
 }
 
-/* As wide as the category area, up to 600px, lined up with the button at its right end. */
+.folder-ruler > div {
+  display: flex;
+  width: max-content;
+}
+
+/* The folder's body. Its top strip sticks with the tabs (and holds the chips of the filters that are on); the
+   results carry it on below. Its top edge runs along the bottom of the tabs at the back. */
+.folder-top {
+  padding: 10px 18px 6px;
+  background: var(--folder);
+  border: 1px solid var(--line);
+  border-bottom: 0;
+  border-radius: 0 var(--radius-lg) 0 0;
+}
+
+/* Stuck: a line and a soft shadow under the top strip, as links scroll under it. */
+.toolbar-wrap.is-stuck .folder-top {
+  box-shadow: 0 1px 0 var(--line), 0 14px 16px -16px rgb(0 0 0 / 0.35);
+}
+
+.results {
+  padding: 2px 18px 24px;
+  background: var(--folder);
+  border: 1px solid var(--line);
+  border-top: 0;
+  border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+}
+
+/* "N more": every category as a grid, with a find box on top. It hangs under the tab line, with its right side
+   under "more" (Toolbar.jsx sets --pop-left). */
 .cat-pop {
-  left: 0;
-  right: 0;
-  width: auto;
-  max-width: 600px;
-  margin-left: auto;
+  left: var(--pop-left, 0);
+  right: auto;
+  width: min(600px, 100%);
   padding: 0;
 }
 
@@ -1378,7 +1369,7 @@ kbd {
   gap: 10px;
   min-width: 0;
   min-height: 46px;
-  padding: 6px 34px 6px 8px;
+  padding: 6px 12px 6px 8px;
   border: 1px solid transparent;
   border-radius: 10px;
   background: transparent;
@@ -1436,17 +1427,19 @@ kbd {
   font-variant-numeric: tabular-nums;
 }
 
+/* The chosen one shows a tick where its count was, so the names get all the room they can. */
 .cat-item-check {
-  position: absolute;
-  right: 10px;
-  top: 50%;
-  transform: translateY(-50%);
+  display: none;
+  flex: none;
   color: var(--hue-ink, var(--accent));
-  visibility: hidden;
+}
+
+.cat-item[aria-selected='true'] .cat-item-count {
+  display: none;
 }
 
 .cat-item[aria-selected='true'] .cat-item-check {
-  visibility: visible;
+  display: block;
 }
 
 /* The Filters button with filters on: the button and an × that clears them all, joined as one. */
@@ -1651,10 +1644,11 @@ kbd {
   padding: 0;
 }
 
+/* --fp-room is the room under the Filters button (Filters.jsx), so the footer never ends up below the window. */
 .filters-panel {
   display: flex;
   flex-direction: column;
-  max-height: min(72vh, 580px);
+  max-height: min(var(--fp-room, 72vh), 580px);
 }
 
 .fp-body {
@@ -1662,6 +1656,13 @@ kbd {
   gap: 18px;
   padding: 16px;
   overflow-y: auto;
+}
+
+/* "Show all 24" after the biggest collections. */
+.fp-more {
+  align-self: center;
+  padding: 6px 4px;
+  font-size: 13px;
 }
 
 .fp-title {
@@ -1821,9 +1822,9 @@ kbd {
   border-radius: var(--radius-lg);
   overflow: hidden;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
-  /* After a long scroll there can be a thousand cards: the browser skips drawing the ones far off-screen. */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 372px;
+  /* Its layers (the invisible button, Open, the tick) stay inside the card. Every card is always drawn: skipping
+     off-screen ones (content-visibility) left blank cards on a fast scroll and held back their pictures. */
+  isolation: isolate;
 }
 
 /* A card lifts a little under the mouse. (Not on touch screens, where a tap would leave it lifted.) */
@@ -1899,7 +1900,7 @@ kbd {
   overflow: hidden;
 }
 
-/* Hidden while it loads (the colored frame shows instead of an empty box), then it fades in, so nothing pops. */
+/* Hidden while it loads (the colored frame shows instead of an empty box), then it fades in quickly, so nothing pops. */
 .preview-picture {
   width: 100%;
   height: 100%;
@@ -1907,11 +1908,16 @@ kbd {
   display: block;
   border-radius: 7px;
   opacity: 0;
-  transition: opacity 0.3s ease;
+  transition: opacity 0.15s ease;
 }
 
 .preview-picture.is-shown {
   opacity: 1;
+}
+
+/* A picture the browser already had shows at once: a card drawn again never flashes its picture. */
+.preview-picture.is-instant {
+  transition: none;
 }
 
 .preview-band {
@@ -2170,8 +2176,7 @@ kbd {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   transition: border-color 0.15s, box-shadow 0.15s;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 84px;
+  isolation: isolate; /* its layers stay inside the row (see .card) */
 }
 
 @media (hover: hover) {
@@ -3422,7 +3427,36 @@ mark {
   -webkit-line-clamp: 5;
 }
 
-/* ---------- Tablets and phones ---------- */
+/* ---------- Laptops, tablets and phones ---------- */
+
+/* Less room for the category tabs: Map, Select and Compare show just their icon (their names show on hover), and
+   Sort says its short name. */
+@media (max-width: 1180px) {
+  .toolbar-tools > .tool-btn {
+    padding: 0 9px;
+  }
+
+  .toolbar-tools > .tool-btn .tool-label,
+  .toolbar-tools .dropdown:not(.filters-drop) .hide-small {
+    display: none;
+  }
+
+  .toolbar-tools .dropdown:not(.filters-drop) .show-small {
+    display: inline;
+  }
+}
+
+/* Tablets: the tools are all icons, so a few tabs still fit next to them. (Phones give the tools their own row.) */
+@media (max-width: 960px) and (min-width: 641px) {
+  .toolbar-tools .tool-label,
+  .toolbar-tools .tool-chevron {
+    display: none;
+  }
+
+  .toolbar-tools .dropdown > .tool-btn:first-child {
+    padding: 0 9px;
+  }
+}
 
 @media (max-width: 960px) {
   .container {
@@ -3459,13 +3493,13 @@ mark {
     display: none;
   }
 
-  /* Less room for the category row here: the "All categories" button is just its icon (with a tooltip). */
-  .cat-picker-btn {
-    padding: 0;
+  /* One view button that shows the current view; each click moves on to the next one. */
+  .toolbar .view-switch {
+    display: none;
   }
 
-  .cat-picker-btn .tool-label {
-    display: none;
+  .view-cycle {
+    display: inline-flex;
   }
 }
 
@@ -3617,32 +3651,27 @@ mark {
     flex: 1 1 140px;
   }
 
-  /* The toolbar: categories on top, the buttons under them. It scrolls with the page here, so it
-     doesn't take a slice of a small screen. */
+  /* The toolbar: the buttons on their own row, then the category tabs, which slide sideways with a finger while
+     "more" stays at the right end. It scrolls with the page here, so it doesn't take a slice of a small screen.
+     There's no room for a folder around the results, so the tabs stand on a plain line instead. */
   :root {
     --toolbar-h: 0px;
   }
 
   .toolbar-wrap {
     position: static;
-    margin: 0;
     padding: 0;
   }
 
   .toolbar {
     flex-wrap: wrap;
-    gap: 6px;
-  }
-
-  .cat-tabs {
-    flex-basis: 100%;
+    gap: 10px;
   }
 
   .toolbar-tools {
+    order: -1;
     width: 100%;
-    padding: 6px 0 0;
-    border-left: 0;
-    border-top: 1px solid var(--line);
+    padding: 0;
   }
 
   .toolbar-tools > .dropdown {
@@ -3667,31 +3696,67 @@ mark {
     padding: 0;
   }
 
-  /* Buttons with only an icon get square. The Sort button drops its icon to make room for its words. */
-  .toolbar-tools > .tool-btn,
-  .cat-picker-btn {
+  /* Buttons with only an icon get square (Compare keeps a little room around its badge). The Sort button drops its
+     icon to make room for its words. */
+  .toolbar-tools > .tool-btn {
     padding: 0;
+  }
+
+  .toolbar-tools > .tool-btn:has(.filters-badge) {
+    padding: 0 7px;
   }
 
   .toolbar-tools .dropdown:not(.filters-drop) .tool-icon {
     display: none;
   }
 
-  .toolbar .view-switch {
+  .folder-tabs {
+    flex-basis: 100%;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    box-shadow: inset 0 -1px var(--line); /* the line the tabs stand on (the front tab covers it) */
+  }
+
+  .folder-tabs::-webkit-scrollbar {
     display: none;
   }
 
-  .view-cycle {
-    display: inline-flex;
+  .folder-tab[aria-pressed='true'] {
+    height: 40px;
+    margin-bottom: 0;
+    background: var(--bg);
   }
 
-  /* The chips row sits inside the toolbar's frame here, since the bar doesn't stick. */
-  .active-filters {
-    padding: 8px 4px 0;
+  /* "more" stays at the right end while the tabs slide under it, with a fade so they don't stop dead. */
+  .folder-tabs > .cat-picker {
+    position: sticky;
+    right: 0;
+    z-index: 2;
+    display: flex;
+    align-items: flex-end;
+    align-self: stretch;
+    padding-left: 18px;
+    background: linear-gradient(to right, transparent, var(--bg) 16px) 0 0 / 100% calc(100% - 1px) no-repeat;
+  }
+
+  .folder-top {
+    padding: 8px 0 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .results {
+    padding: 0;
+    background: none;
+    border: 0;
+    border-radius: 0;
   }
 
   /* The categories window is a sheet here: the find box on top, the grid scrolls, two columns. */
   .cat-pop {
+    left: 0;
     width: auto;
     max-width: none;
     margin: 0;

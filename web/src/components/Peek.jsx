@@ -37,6 +37,21 @@ const subscribe = listener => {
   return () => listeners.delete(listener);
 };
 
+// Scrolling moves the items under a still mouse, so a panel would open for whatever passes by and close again at
+// the next scroll step. While you scroll (and a moment after) no panel is planned, and one about to show is called off.
+const SCROLL_REST = 150;
+let scrolledAt = 0;
+if (typeof window !== 'undefined') {
+  window.addEventListener(
+    'scroll',
+    () => {
+      scrolledAt = Date.now();
+      clearTimeout(showTimer);
+    },
+    { capture: true, passive: true },
+  );
+}
+
 export function hidePeek() {
   clearTimeout(showTimer);
   clearTimeout(hideTimer);
@@ -51,6 +66,7 @@ function schedule(anchor, x, latest) {
   clearTimeout(showTimer);
   clearTimeout(hideTimer);
   if (state?.id === latest.current.link.id) return; // back from the panel onto the same item: keep it
+  if (Date.now() - scrolledAt < SCROLL_REST) return;
   const warm = state || Date.now() - hiddenAt < 300;
   showTimer = setTimeout(() => {
     const { link, owner, onOpen } = latest.current;

@@ -60,7 +60,8 @@ export const ai = process.env.AI_BASE_URL
   : {
       endpoint: 'https://api.groq.com/openai/v1/chat/completions',
       apiKey: process.env.GROQ_API_KEY ?? '',
-      models: (process.env.AI_MODELS || 'llama-3.1-8b-instant,openai/gpt-oss-20b,openai/gpt-oss-120b')
+      // (llama-3.1-8b-instant left this list in October 2026: Groq no longer offers it.)
+      models: (process.env.AI_MODELS || 'openai/gpt-oss-20b,openai/gpt-oss-120b')
         .split(',')
         .map(model => model.trim())
         .filter(Boolean),

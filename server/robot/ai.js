@@ -5,6 +5,7 @@
 // moves to the next one in the list. When all are used up, it pauses and tries again later.
 import { ai as config, CATEGORIES, PRICING } from '../config.js';
 import { normalizeTags } from './describe.js';
+import { hostOf } from './url.js';
 
 const MAX_TEXT = 3500; // of the saved page
 const MAX_EXTRA_TEXT = 900; // of each extra page of the website
@@ -49,9 +50,68 @@ function retryAfter(res) {
 }
 
 export async function describeWithAi(info) {
+  return parseAnswer(await chat(buildPrompt(info), 1500));
+}
+
+// The compare window's "Which should I pick?": the AI reads 2 to 4 links side by side and picks one.
+// Answers { pickId, reason, others: [{ id, when }] }.
+export async function pickWithAi(links) {
+  const blocks = links.map((link, index) =>
+    [
+      `[${index + 1}] ${link.title} (${link.source === 'github' ? 'GitHub' : hostOf(link.url)})`,
+      `Price: ${link.pricing}`,
+      link.level && `Level: ${link.level}`,
+      link.useFor && `Use it for: ${link.useFor}`,
+      link.summary && `Summary: ${link.summary}`,
+      link.tasks.length && `Can do: ${link.tasks.join('; ')}`,
+      link.features.length && `Key features: ${link.features.join('; ')}`,
+      link.github && `GitHub: ${link.github.stars} stars, language ${link.github.language ?? 'n/a'}, license ${link.github.license ?? 'none'}`,
+      `The owner's status: ${link.myStatus || 'not set'}, opened ${link.opens} times`,
+      link.note && `The owner's note: ${clean(link.note).slice(0, 300)}`,
+    ]
+      .filter(Boolean)
+      .join('\n'),
+  );
+  const response = await chat(
+    [
+      {
+        role: 'system',
+        content: 'You help someone choose between tools from their own saved library. Answer with one JSON object and nothing else. Write in simple, plain English.',
+      },
+      {
+        role: 'user',
+        content: `Which of these is the best pick for most people, and when would someone choose each of the others instead?
+
+${blocks.join('\n\n')}
+
+Return JSON with these keys:
+- "pick": the number of the best one
+- "reason": one or two short sentences saying why
+- "others": for every other one, { "number": its number, "when": one short sentence starting with "Choose it when" }
+
+Use only the facts above.`,
+      },
+    ],
+    600,
+  );
+  const content = response.choices?.[0]?.message?.content ?? '';
+  const answer = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+  const at = number => links[Number(number) - 1];
+  const pick = at(answer.pick) ?? links[0];
+  return {
+    pickId: pick.id,
+    reason: clean(answer.reason).slice(0, 400),
+    others: (Array.isArray(answer.others) ? answer.others : [])
+      .map(other => ({ id: at(other?.number)?.id, when: clean(other?.when).slice(0, 240) }))
+      .filter(other => other.id && other.id !== pick.id && other.when),
+  };
+}
+
+// One question to the free AI, moving on to the next model when one is used up (see the top of this file).
+// Gives back the AI service's whole answer.
+async function chat(messages, maxTokens) {
   if (!aiEnabled()) throw new AiPaused('no AI key is set', Infinity);
   if (Date.now() < pausedUntil) throw new AiPaused(pauseReason, pausedUntil);
-  const messages = buildPrompt(info);
 
   for (let round = 0; round < 3; round++) {
     const ready = models.filter(model => (coolUntil.get(model) ?? 0) <= Date.now());
@@ -71,7 +131,7 @@ export async function describeWithAi(info) {
             model,
             messages,
             temperature: 0.2,
-            max_tokens: 1500,
+            max_tokens: maxTokens,
             response_format: { type: 'json_object' },
             // gpt-oss models "think" before answering; a little thinking is enough here.
             ...(model.startsWith('openai/gpt-oss') && { reasoning_effort: 'low' }),
@@ -82,7 +142,7 @@ export async function describeWithAi(info) {
         pause(`couldn't reach the AI (${err.cause?.code ?? err.name})`, 2 * 60_000);
       }
 
-      if (res.ok) return parseAnswer(await res.json());
+      if (res.ok) return res.json();
       const body = await res.text();
       if (res.status === 429) {
         coolUntil.set(model, Date.now() + retryAfter(res));

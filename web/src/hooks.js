@@ -8,7 +8,7 @@ import { isWorking } from './format.js';
 
 const DEFAULTS = {
   q: '', exact: false, category: '', source: '', collection: '', tag: '', level: '', status: '', favorite: false, free: false,
-  broken: false, sort: 'newest', link: '',
+  broken: false, sort: 'newest', link: '', compare: '',
 };
 const YES_NO = new Set(['exact', 'favorite', 'free', 'broken']);
 // The choices that stay with you when Back leaves a search (see useUrlState).
@@ -117,7 +117,7 @@ export function useView(searching) {
       return '';
     }
   });
-  const choose = value => {
+  const choose = useCallback(value => {
     if (!VIEWS.includes(value)) return;
     setChoice(value);
     try {
@@ -125,7 +125,7 @@ export function useView(searching) {
     } catch {
       // private browsing: the choice just isn't remembered
     }
-  };
+  }, []);
   return [choice || (searching || phone ? 'list' : 'cards'), choose];
 }
 
@@ -231,7 +231,7 @@ export function useTracked(ids) {
   return ids.map(id => tracked.get(id)).filter(Boolean);
 }
 
-// Puts fresh copies of links into every list and detail view already on screen.
+// Puts fresh copies of links into every list, detail view and compare window already on screen.
 // Fresh copies are merged in, so a list's short copy never wipes out the details already shown.
 export function patchLinks(queryClient, fresh) {
   const byId = new Map(fresh.map(link => [link.id, link]));
@@ -239,6 +239,7 @@ export function patchLinks(queryClient, fresh) {
   queryClient.setQueriesData({ queryKey: ['links'] }, data =>
     data?.pages ? { ...data, pages: data.pages.map(page => ({ ...page, items: page.items.map(merge) })) } : data,
   );
+  queryClient.setQueriesData({ queryKey: ['compare'] }, data => (data?.items ? { ...data, items: data.items.map(merge) } : data));
   for (const link of fresh) {
     queryClient.setQueriesData({ queryKey: ['link', link.id] }, data => (data ? { ...data, link: { ...data.link, ...link } } : data));
   }
@@ -313,7 +314,8 @@ export function useShortcuts(shortcuts) {
   latest.current = shortcuts;
   useEffect(() => {
     const onKey = event => {
-      if (event.metaKey || event.ctrlKey || event.altKey) return;
+      // A menu or panel already used the key (Esc closing the Filters panel, say).
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.target.closest?.('input, textarea, select, [contenteditable], dialog')) return;
       // A window is open (details, Add links…): the page behind it shouldn't react to keys.
       if (document.querySelector('dialog[open]')) return;

@@ -1,12 +1,14 @@
-/* The compact view (small tiles, like files in a folder), the icon-only Open arrow, and the date on list rows.
+/* The compact view (tiles, like files in a folder), the icon-only Open arrow, and the date on list rows.
    Cards and rows themselves are styled in styles.css. */
 
-/* ---------- Compact view: many small tiles per line ---------- */
+/* ---------- Compact view: about eight tiles per line on a big screen ---------- */
 
+/* A tile is never narrower than 190px. With the page's side padding that makes 8 a line on a 2000px screen,
+   6 on a 1440px laptop, 4 on a tablet (phones get 2, at the end of this file). */
 .tiles {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
 }
 
 .tiles.is-closest .tile {
@@ -14,19 +16,21 @@
 }
 
 .tile {
+  /* The name's and the website's line heights, set in pixels: the room kept for them (.tile-text) is worked out
+     from these, so every tile and its loading shape come out exactly as tall. */
+  --title-line: 18px;
+  --host-line: 16px;
   position: relative;
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 15px 12px 12px;
+  padding: 15px 12px 13px;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   overflow: hidden;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
-  /* A thousand tiles after a long scroll: the browser skips drawing the ones far off-screen. */
-  content-visibility: auto;
-  contain-intrinsic-size: auto 138px;
+  isolation: isolate; /* its layers stay inside the tile (see .card in styles.css) */
 }
 
 /* A thin line in the territory color along the top, like the label on a folder. */
@@ -48,31 +52,38 @@
   box-shadow: 0 0 0 1px var(--accent);
 }
 
+/* (The compare window's column heads borrow this square and set their own size.) */
 .tile-icon {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
   background: var(--hue-soft, var(--surface-2));
   color: var(--hue-ink, var(--muted));
   flex: none;
 }
 
 .tile-icon img {
-  width: 26px;
-  height: 26px;
+  width: 28px;
+  height: 28px;
   object-fit: contain;
-  border-radius: 5px;
+  border-radius: 6px;
+}
+
+/* The name (up to two lines) and the website. Room for two lines of name is always kept, so every tile is as tall
+   as the others and as its loading shape: a short name leaves the extra space above the tags instead. */
+.tile-text {
+  min-height: calc(2 * var(--title-line) + 3px + var(--host-line));
+  margin: 11px 0 10px;
 }
 
 .tile-title {
-  margin-top: 10px;
   font-family: var(--display);
-  font-size: 13.5px;
+  font-size: 14px;
   font-weight: 650;
   letter-spacing: -0.005em;
-  line-height: 1.3;
+  line-height: var(--title-line);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -85,31 +96,83 @@
 }
 
 .tile-host {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-  margin: 4px 0 0;
-  font-size: 11.5px;
-  line-height: 1.4;
+  margin: 3px 0 0;
+  font-size: 12px;
+  line-height: var(--host-line);
   color: var(--muted);
-}
-
-.tile-host > span:first-child {
-  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.tile-star {
+/* The small tags, pinned to the bottom so they line up across a line of tiles. They're only words to read:
+   a click goes through them to the tile's invisible "open details" button. */
+.tile-tags {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 20px;
+  margin-top: auto;
+  pointer-events: none;
+}
+
+/* Category and price. A tag that doesn't fit wraps onto a second line, which is hidden, so a tag is either whole
+   or left out. (A category too long even on its own, in a very narrow tile, is shortened with "…".) */
+.tile-tags-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+  height: 20px;
+  overflow: hidden;
+}
+
+.tile-tag {
+  max-width: 100%;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* The category in its territory color, like the badge on cards. */
+.tile-cat {
+  background: var(--hue-soft);
+  color: var(--hue-ink);
+}
+
+/* Stars (GitHub) and the favorite's star, at the right end. */
+.tile-tags-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.tile-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.tile-fav {
   display: inline-grid;
   place-items: center;
-  flex: none;
   color: #e8a200;
 }
 
-.tile-star svg {
+.tile-fav svg {
   fill: currentColor;
 }
 
@@ -135,15 +198,89 @@
   left: auto;
 }
 
-.skeleton-tile {
-  gap: 8px;
+/* The loading shape: the same boxes as a loaded tile (the icon square, the room for the name and website, the tags
+   line), so nothing moves when the links arrive. The bars sit where a one-line name and the website would. */
+.skeleton-tile .tile-icon-skeleton {
+  width: 46px;
+  height: 46px;
+  border-radius: 13px;
 }
 
-.skeleton-tile .tile-icon-skeleton {
+.tile-title-skeleton {
+  width: 72%;
+  height: 12px;
+  margin-top: calc((var(--title-line) - 12px) / 2);
+}
+
+.tile-host-skeleton {
+  width: 48%;
+  height: 10px;
+  margin-top: calc((var(--title-line) - 12px) / 2 + 3px + (var(--host-line) - 10px) / 2);
+}
+
+.tile-tag-skeleton {
+  flex: none;
+  width: 62px;
+  height: 20px;
+  border-radius: 999px;
+}
+
+.tile-tag-skeleton.short {
   width: 44px;
-  height: 44px;
-  margin-bottom: 4px;
-  border-radius: 12px;
+}
+
+/* ---------- "In compare": links in the compare picks (hidden while selecting links) ---------- */
+
+/* Cards: a small labelled chip in the picture's top-left corner, across from the price. */
+.in-compare-chip {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 8px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 650;
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.12), inset 0 0 0 1px color-mix(in oklab, var(--accent) 22%, transparent);
+  pointer-events: none;
+}
+
+/* Rows and tiles: a small round badge on the corner of the site icon. */
+.row > .row-icon,
+.tile-icon {
+  position: relative;
+}
+
+.in-compare-dot {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  display: grid;
+  place-items: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 2px var(--surface);
+}
+
+/* The mark pops in only when you add the link, not each time a card already in compare is drawn
+   (a new page of links while you scroll would make them all flash). */
+.in-compare-chip.is-new,
+.in-compare-dot.is-new {
+  animation: in-compare-in 0.18s ease-out;
+}
+
+@keyframes in-compare-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
 }
 
 /* ---------- List rows: the date at the right end of the meta line ---------- */
@@ -186,31 +323,50 @@
   }
 }
 
-/* ---------- Phones: three tiles per line ---------- */
+/* ---------- Phones: two tiles per line ---------- */
 
 @media (max-width: 640px) {
   .tiles {
-    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-    gap: 8px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
   }
 
   .tile {
-    padding: 13px 10px 10px;
-    contain-intrinsic-size: auto 152px;
+    --title-line: 17px;
+    --host-line: 15px;
+    padding: 13px 10px 11px;
   }
 
   .tile-icon,
   .skeleton-tile .tile-icon-skeleton {
-    width: 40px;
-    height: 40px;
-    border-radius: 11px;
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+  }
+
+  .tile-icon img {
+    width: 26px;
+    height: 26px;
+  }
+
+  .tile-text {
+    margin: 10px 0 9px;
   }
 
   .tile-title {
-    font-size: 12.5px;
+    font-size: 13px;
   }
 
   .tile-host {
+    font-size: 11.5px;
+  }
+
+  .tile-tag {
+    padding: 1px 5px;
+    font-size: 10.5px;
+  }
+
+  .tile-tags-end {
     font-size: 11px;
   }
 

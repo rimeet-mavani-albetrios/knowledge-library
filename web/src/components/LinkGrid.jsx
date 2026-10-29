@@ -1,12 +1,14 @@
 // The results, as cards, as small tiles or as a list. Loads 24 at a time and fetches the next 24 when you scroll
 // near the bottom. A search shows two groups: the best matches first, then links about something close. Only the
 // first few related links show until you ask for more, so a search is a short page.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { ChevronDown, LoaderCircle, Plus, RefreshCw, SearchX } from 'lucide-react';
 import { linkFilters, useLinks } from '../useLinks.js';
 import LinkCard, { LinkRow, LinkTile } from './LinkCard.jsx';
 import { PeekLayer } from './Peek.jsx';
 import BulkBar from './BulkBar.jsx';
+import { detailQuery } from './LinkDrawer.jsx';
 
 function SkeletonCard() {
   return (
@@ -34,20 +36,29 @@ function SkeletonRow() {
   );
 }
 
+// The same boxes as a loaded tile (icon, room for the name and website, the tags line), so it's exactly as tall
+// and nothing moves when the links arrive.
 function SkeletonTile() {
   return (
     <div className="tile skeleton-tile" aria-hidden="true">
       <span className="tile-icon-skeleton skeleton" />
-      <span className="skeleton skeleton-text" />
-      <span className="skeleton skeleton-text short" />
+      <div className="tile-text">
+        <span className="tile-title-skeleton skeleton" />
+        <span className="tile-host-skeleton skeleton" />
+      </div>
+      <div className="tile-tags">
+        <span className="tile-tag-skeleton skeleton" />
+        <span className="tile-tag-skeleton short skeleton" />
+      </div>
     </div>
   );
 }
 
 // `view` is 'cards', 'compact' or 'list'. Each has its own item, placeholder and layout class.
+// The compact view's 24 placeholders are one page of links, and fill whole lines of 8, 6, 4, 3 or 2 tiles.
 const VIEWS = {
   cards: { Item: LinkCard, Skeleton: SkeletonCard, layout: 'grid', skeletons: 8 },
-  compact: { Item: LinkTile, Skeleton: SkeletonTile, layout: 'tiles', skeletons: 18 },
+  compact: { Item: LinkTile, Skeleton: SkeletonTile, layout: 'tiles', skeletons: 24 },
   list: { Item: LinkRow, Skeleton: SkeletonRow, layout: 'list', skeletons: 8 },
 };
 const viewOf = view => VIEWS[view] ?? VIEWS.cards;
@@ -65,6 +76,7 @@ function Group({ title, count, hint, view, children }) {
 }
 
 const RELATED_SHOWN = 6;
+const LOAD_AHEAD_WAIT = 150; // the mouse rests this long on a link before its details load ahead
 
 // Keys once a result has the focus (press ↓ in the search box, or Tab): ← → go one link, ↑ ↓ one line of cards
 // or tiles, Enter opens the details, O opens the website. ↑ from the first result goes back to the search box.
@@ -87,9 +99,10 @@ function moveThroughResults(event) {
 }
 
 // `view` is 'cards', 'compact' or 'list'. `selecting` is on while you pick links to change many at once (the
-// toolbar's Select button); `onStopSelecting` turns it off. `chips` are the filters that are on, shown next to
-// the count (nothing when there are none).
-export default function LinkGrid({ params, setParams, owner, onOpen, onAdd, view, selecting, onStopSelecting, chips }) {
+// toolbar's Select button); `onStopSelecting` turns it off. (Links to compare are picked in their own window,
+// ComparePicker.jsx, so the list never changes for that.)
+// `chips` are the filters that are on, shown next to the count (nothing when none).
+function LinkGrid({ params, setParams, owner, onOpen, onAdd, view, selecting, onStopSelecting, chips }) {
   const { q, category, source, collection, tag, level, status, favorite, free, broken } = params;
   const query = useLinks(params);
   const [allRelatedFor, setAllRelatedFor] = useState(null); // the search whose related links are all shown
@@ -97,6 +110,18 @@ export default function LinkGrid({ params, setParams, owner, onOpen, onAdd, view
   // so nothing you can't see stays selected.
   const [selected, setSelected] = useState(() => new Set());
   const lastSummary = useRef(''); // the count line of the last results, kept while new ones load
+  // Resting the mouse on a link loads its details ahead, so a click opens the window complete at once.
+  // (Just moving across the links loads nothing; links loaded in the last few minutes aren't loaded again.)
+  const queryClient = useQueryClient();
+  const ahead = useRef({ id: null, timer: 0 });
+  useEffect(() => () => clearTimeout(ahead.current.timer), []);
+  const loadAhead = event => {
+    if (selecting || event.pointerType === 'touch') return;
+    const id = event.target.closest?.('[data-id]')?.dataset.id ?? null;
+    if (id === ahead.current.id) return;
+    clearTimeout(ahead.current.timer);
+    ahead.current = { id, timer: id ? setTimeout(() => queryClient.prefetchQuery(detailQuery(id, q)), LOAD_AHEAD_WAIT) : 0 };
+  };
   const filtersKey = JSON.stringify(linkFilters(params));
   useEffect(() => setSelected(new Set()), [filtersKey, selecting]);
   const toggle = useCallback(
@@ -147,18 +172,28 @@ export default function LinkGrid({ params, setParams, owner, onOpen, onAdd, view
   const searched = first?.corrected ?? q;
   const grouped = q && first && !first.closestOnly;
 
-  // While new results load, the last count line stays (with a small spinner) and changes once, when they're here.
+  // Only a search gets a line above the links ("12 links found for …"). Browsing has none: the count was just noise,
+  // and the grey placeholder boxes already show that links are loading. While a search's new results load, its
+  // last line stays (with a small spinner) and changes once, when they're here.
   const loading = stale || query.isLoading;
   let summary = '';
-  if (loading) summary = lastSummary.current || (q ? `Searching for “${q}”…` : 'Loading…');
+  if (!q) lastSummary.current = '';
+  else if (loading) summary = lastSummary.current || `Searching for “${q}”…`;
   else if (first?.closestOnly) summary = `Nothing matches “${searched}” closely. These are the nearest links.`;
-  else if (first && q) summary = `${first.total} ${first.total === 1 ? 'link' : 'links'} found for “${searched}”`;
-  else if (first) summary = `${first.total} ${first.total === 1 ? 'link' : 'links'}`;
-  if (!loading) lastSummary.current = summary;
+  else if (first) summary = `${first.total} ${first.total === 1 ? 'link' : 'links'} found for “${searched}”`;
+  if (q && !loading) lastSummary.current = summary;
 
   const { Item, Skeleton, layout, skeletons: skeletonCount } = viewOf(view);
   const item = link => (
-    <Item key={link.id} link={link} owner={owner} onOpen={onOpen} selectable={selecting} selected={selected.has(link.id)} onToggle={toggle} />
+    <Item
+      key={link.id}
+      link={link}
+      owner={owner}
+      onOpen={onOpen}
+      selectable={selecting}
+      selected={selected.has(link.id)}
+      onToggle={toggle}
+    />
   );
   const loadingMore = query.isLoading || isFetchingNextPage || (stale && !links.length);
   const skeletons =
@@ -171,14 +206,24 @@ export default function LinkGrid({ params, setParams, owner, onOpen, onAdd, view
   const hiddenRelated = grouped ? first.total - first.bestTotal - shownRelated.length : 0;
 
   return (
-    <section className="results" id="results" aria-label="Links" aria-busy={query.isFetching} onKeyDown={moveThroughResults}>
-      <div className="results-head">
-        <p className="results-summary" aria-live="polite" aria-busy={loading}>
-          {summary}
-          {loading && <LoaderCircle size={15} className="spin summary-spin" aria-label="Loading" />}
-        </p>
-        {chips}
-      </div>
+    <section
+      className="results"
+      id="results"
+      aria-label="Links"
+      aria-busy={query.isFetching}
+      onKeyDown={moveThroughResults}
+      onPointerOver={loadAhead}
+      onPointerLeave={loadAhead}
+    >
+      {summary || chips ? (
+        <div className="results-head">
+          <p className="results-summary" aria-live="polite" aria-busy={loading}>
+            {summary}
+            {loading && summary ? <LoaderCircle size={15} className="spin summary-spin" aria-label="Loading" /> : null}
+          </p>
+          {chips}
+        </div>
+      ) : null}
       {first?.corrected && (
         <p className="spelling">
           Showing results for <strong>{first.corrected}</strong>.{' '}
@@ -267,3 +312,6 @@ export default function LinkGrid({ params, setParams, owner, onOpen, onAdd, view
     </section>
   );
 }
+
+// Opening or closing a window doesn't change the results, so the list isn't drawn again then.
+export default memo(LinkGrid);
