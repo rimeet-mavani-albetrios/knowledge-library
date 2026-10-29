@@ -142,11 +142,12 @@ h3 {
   top: 12px;
 }
 
+/* The page uses the whole screen, with a little air at the sides; only very wide screens get a cap. */
 .container {
   width: 100%;
-  max-width: 1280px;
+  max-width: 1720px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 32px;
 }
 
 .spin {
@@ -186,8 +187,11 @@ h3 {
   color: var(--on-accent);
 }
 
-.btn-primary:hover:not(:disabled) {
-  background: var(--accent-hover);
+/* Hover looks live only where there's a mouse: a finger would leave them "stuck" after a tap. */
+@media (hover: hover) {
+  .btn-primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+  }
 }
 
 .btn-primary:disabled {
@@ -200,9 +204,11 @@ h3 {
   color: var(--text);
 }
 
-.btn-ghost:hover:not(:disabled) {
-  border-color: var(--line-strong);
-  background: var(--surface-2);
+@media (hover: hover) {
+  .btn-ghost:hover:not(:disabled) {
+    border-color: var(--line-strong);
+    background: var(--surface-2);
+  }
 }
 
 .btn-danger {
@@ -222,18 +228,20 @@ h3 {
   flex: none;
 }
 
-.icon-btn:hover:not(:disabled) {
-  background: var(--surface-2);
-  color: var(--text);
+@media (hover: hover) {
+  .icon-btn:hover:not(:disabled) {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .icon-btn.danger:hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
 }
 
 .icon-btn:disabled {
   opacity: 0.4;
-}
-
-.icon-btn.danger:hover {
-  background: var(--danger-soft);
-  color: var(--danger);
 }
 
 .input {
@@ -245,8 +253,10 @@ h3 {
   font-size: 15px;
 }
 
-.input:hover {
-  border-color: var(--line-strong);
+@media (hover: hover) {
+  .input:hover {
+    border-color: var(--line-strong);
+  }
 }
 
 .input:focus {
@@ -282,8 +292,10 @@ textarea.input {
   color: var(--muted);
 }
 
-.segmented button:hover {
-  color: var(--text);
+@media (hover: hover) {
+  .segmented button:hover {
+    color: var(--text);
+  }
 }
 
 .segmented button[aria-pressed='true'] {
@@ -371,7 +383,7 @@ kbd {
 .header-row {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 20px;
   height: var(--header-h);
 }
 
@@ -398,12 +410,6 @@ kbd {
   text-overflow: ellipsis;
 }
 
-.brand-count {
-  display: block;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-
 .header-actions {
   display: flex;
   align-items: center;
@@ -411,11 +417,11 @@ kbd {
   margin-left: auto;
 }
 
-/* The small search box that shows in the top bar once the big one has scrolled away. */
+/* The small search box that shows in the top bar once the big one has scrolled away: centred, never silly wide. */
 .header-search {
   flex: 1;
   min-width: 0;
-  max-width: 560px;
+  max-width: 640px;
   margin: 0 auto;
 }
 
@@ -474,9 +480,11 @@ kbd {
   text-align: left;
 }
 
-.menu a:hover,
-.menu button:hover {
-  background: var(--surface-2);
+@media (hover: hover) {
+  .menu a:hover,
+  .menu button:hover {
+    background: var(--surface-2);
+  }
 }
 
 .menu-label {
@@ -487,15 +495,17 @@ kbd {
 
 /* ---------- Page layout ---------- */
 /* Big screens: search on the left, a short map on the right, then the toolbar and the results.
-   The layout stays the same while you search, so the search box never moves. */
+   The layout stays the same while you search, so the search box never moves.
+   The search column takes a bit more than half the width, but never more than 780px: on a wide screen
+   a search box that long looks silly, so the extra room goes to the map instead. */
 
 .page {
   display: grid;
-  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, min(780px, 55%)) minmax(0, 1fr);
   grid-template-areas:
     'hero map'
     'browse browse';
-  column-gap: 40px;
+  column-gap: clamp(40px, 4vw, 72px);
   align-items: center;
   padding-top: 20px;
 }
@@ -531,13 +541,10 @@ kbd {
 
 /* ---------- Knowledge map ---------- */
 
-.map {
-  margin: 0;
-}
-
 /* The map's note sits inside its frame, so the map takes no extra room. */
 .map {
   position: relative;
+  margin: 0;
 }
 
 .map figcaption {
@@ -723,10 +730,6 @@ kbd {
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 
-.search-box:hover {
-  border-color: var(--line-strong);
-}
-
 .search-box:focus-within {
   border-color: var(--accent);
   box-shadow: 0 0 0 4px var(--accent-soft);
@@ -899,9 +902,14 @@ kbd {
   opacity: 0.6;
 }
 
-.suggest-item:hover .suggest-forget,
 .suggest-item.is-active .suggest-forget {
   opacity: 1;
+}
+
+@media (hover: hover) {
+  .suggest-item:hover .suggest-forget {
+    opacity: 1;
+  }
 }
 
 /* One line of examples; more slide in sideways. */
@@ -927,10 +935,12 @@ kbd {
   font-size: 13.5px;
 }
 
-.examples button:hover {
-  border-style: solid;
-  border-color: var(--accent);
-  color: var(--accent-text);
+@media (hover: hover) {
+  .examples button:hover {
+    border-style: solid;
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
 }
 
 /* ---------- Filters: the badge, the chips of filters that are on ---------- */
@@ -948,18 +958,34 @@ kbd {
   font-weight: 700;
 }
 
+/* The thin row of chips under the toolbar: it's part of the sticky block, so it stays while you scroll. */
 .active-filters {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px 8px;
+  padding: 8px 8px 2px;
+  font-size: 14px;
+}
+
+.active-filters-label {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  margin-right: 2px;
 }
 
 .chip-active {
-  height: 32px;
+  height: 30px;
+  padding: 0 8px 0 11px;
   background: var(--accent-soft);
   border-color: transparent;
   color: var(--accent-text);
+  font-size: 13.5px;
+}
+
+.chip-active svg {
+  opacity: 0.7;
 }
 
 .chip {
@@ -978,8 +1004,16 @@ kbd {
   white-space: nowrap;
 }
 
-.chip:hover:not(:disabled) {
-  border-color: var(--line-strong);
+@media (hover: hover) {
+  .chip:hover:not(:disabled) {
+    border-color: var(--line-strong);
+  }
+
+  .chip-active:hover:not(:disabled),
+  .chip-active-tag:hover:not(:disabled) {
+    border-color: transparent;
+    background: color-mix(in oklab, var(--accent) 22%, var(--surface));
+  }
 }
 
 .chip:disabled {
@@ -1010,9 +1044,12 @@ kbd {
 }
 
 .chip-active-tag {
+  height: 30px;
+  padding: 0 8px 0 11px;
   background: var(--accent-soft);
   border-color: transparent;
   color: var(--accent-text);
+  font-size: 13.5px;
 }
 
 .tag-list button {
@@ -1024,15 +1061,17 @@ kbd {
   border-radius: 6px;
 }
 
-.tag-list button:hover {
-  background: var(--accent-soft);
+@media (hover: hover) {
+  .tag-list button:hover {
+    background: var(--accent-soft);
+  }
 }
 
-/* ---------- Toolbar: categories, Filters, Sort, Map, Select, cards or list ---------- */
+/* ---------- Toolbar: categories, Filters, Sort, Map, Select, cards / compact / list ---------- */
 /* On big screens it sticks under the top bar while you scroll the results. */
 
 :root {
-  --toolbar-h: 64px; /* the sticky toolbar's height, so scrolling stops just under it */
+  --toolbar-h: 64px; /* the sticky toolbar's height, so scrolling stops just under it (measured by Toolbar.jsx) */
 }
 
 .browse {
@@ -1076,8 +1115,22 @@ kbd {
   min-width: 32px;
 }
 
-/* Categories: one row that slides sideways. The ‹ › buttons and a fade show there's more. */
+/* Categories: "All" pinned at the left, a row that slides sideways (the ‹ › buttons and a fade show there's
+   more), and "All categories" at the right, which opens them all as a grid. */
 .cat-tabs {
+  position: relative; /* the "All categories" window hangs under this whole area, so it never runs off the screen */
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.cat-all {
+  flex: none;
+}
+
+.cat-scroll {
   position: relative;
   display: flex;
   flex: 1;
@@ -1085,9 +1138,11 @@ kbd {
 }
 
 .cat-row {
+  position: relative; /* so a tab's position is measured from the row (Toolbar.jsx slides the chosen one into view) */
   display: flex;
   gap: 2px;
   min-width: 0;
+  width: 100%;
   overflow-x: auto;
   scrollbar-width: none;
 }
@@ -1096,15 +1151,15 @@ kbd {
   display: none;
 }
 
-.cat-tabs.more-right .cat-row {
+.cat-scroll.more-right .cat-row {
   mask-image: linear-gradient(to right, #000 calc(100% - 56px), transparent);
 }
 
-.cat-tabs.more-left .cat-row {
+.cat-scroll.more-left .cat-row {
   mask-image: linear-gradient(to left, #000 calc(100% - 56px), transparent);
 }
 
-.cat-tabs.more-left.more-right .cat-row {
+.cat-scroll.more-left.more-right .cat-row {
   mask-image: linear-gradient(to right, transparent, #000 56px, #000 calc(100% - 56px), transparent);
 }
 
@@ -1122,11 +1177,14 @@ kbd {
   font-size: 14px;
   font-weight: 500;
   white-space: nowrap;
+  transition: background-color 0.15s, color 0.15s;
 }
 
-.cat-tab:hover {
-  background: var(--surface-2);
-  color: var(--text);
+@media (hover: hover) {
+  .cat-tab:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
 }
 
 /* The color dot matches the category's dots on the map. */
@@ -1150,7 +1208,7 @@ kbd {
 }
 
 .cat-count {
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 500;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
@@ -1159,6 +1217,40 @@ kbd {
 .cat-tab[aria-pressed='true'] .cat-count {
   color: inherit;
   opacity: 0.7;
+}
+
+/* A tab and, when it's the chosen one, its small ×, which takes you back to All. */
+.cat-pick {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+}
+
+.cat-pick.is-on .cat-tab {
+  padding-right: 32px;
+}
+
+.cat-x {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--hue) 18%, transparent);
+  color: var(--hue-ink);
+  transition: background-color 0.15s;
+}
+
+@media (hover: hover) {
+  .cat-x:hover {
+    background: var(--hue-ink);
+    color: var(--surface);
+  }
 }
 
 .cat-arrow {
@@ -1177,8 +1269,10 @@ kbd {
   box-shadow: var(--shadow);
 }
 
-.cat-arrow:hover {
-  border-color: var(--line-strong);
+@media (hover: hover) {
+  .cat-arrow:hover {
+    border-color: var(--line-strong);
+  }
 }
 
 .cat-arrow.left {
@@ -1197,6 +1291,186 @@ kbd {
 @media (hover: none) {
   .cat-arrow {
     display: none;
+  }
+}
+
+/* "All categories": the button and its window, a grid of every category with a find box on top.
+   (The window's place is measured from .cat-tabs, not from this small wrapper: see .cat-pop.) */
+.cat-tabs .cat-picker {
+  position: static;
+  flex: none;
+}
+
+.cat-picker-btn {
+  border-color: transparent;
+  color: var(--text-2);
+}
+
+/* As wide as the category area, up to 600px, lined up with the button at its right end. */
+.cat-pop {
+  left: 0;
+  right: 0;
+  width: auto;
+  max-width: 600px;
+  margin-left: auto;
+  padding: 0;
+}
+
+.cat-pop-inner {
+  display: flex;
+  flex-direction: column;
+  max-height: min(70vh, 560px);
+}
+
+.cat-find {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  margin: 8px 8px 0;
+  padding: 0 6px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--muted);
+}
+
+.cat-find:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.cat-find input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 14.5px;
+  outline: none;
+}
+
+.cat-find input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.cat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 2px;
+  min-height: 0;
+  padding: 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.cat-grid-empty {
+  margin: 0;
+  padding: 18px 16px 22px;
+  text-align: center;
+}
+
+.cat-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 46px;
+  padding: 6px 34px 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+@media (hover: hover) {
+  .cat-item:hover {
+    background: var(--surface-2);
+  }
+}
+
+.cat-item:focus-visible {
+  outline-offset: -2px;
+}
+
+.cat-item[aria-selected='true'] {
+  background: var(--hue-soft, var(--surface-2));
+  border-color: color-mix(in oklab, var(--hue, var(--text)) 40%, transparent);
+}
+
+.cat-item-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--hue-soft, var(--surface-2));
+  color: var(--hue-ink, var(--text-2));
+}
+
+.cat-item[aria-selected='true'] .cat-item-icon {
+  background: var(--hue, var(--text));
+  color: var(--surface);
+}
+
+.cat-item-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cat-item-count {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cat-item-check {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--hue-ink, var(--accent));
+  visibility: hidden;
+}
+
+.cat-item[aria-selected='true'] .cat-item-check {
+  visibility: visible;
+}
+
+/* The Filters button with filters on: the button and an × that clears them all, joined as one. */
+.filters-drop {
+  display: flex;
+}
+
+.filters-drop.is-split > .tool-btn:first-child {
+  border-radius: 10px 0 0 10px;
+}
+
+.filters-clear {
+  width: 34px;
+  min-width: 0;
+  margin-left: -1px;
+  padding: 0;
+  border-radius: 0 10px 10px 0;
+  box-shadow: inset 1px 0 0 color-mix(in oklab, var(--accent) 25%, transparent);
+}
+
+@media (hover: hover) {
+  .tool-btn.filters-clear:hover {
+    background: var(--accent);
+    color: var(--on-accent);
   }
 }
 
@@ -1219,10 +1493,22 @@ kbd {
   transition: background-color 0.15s, border-color 0.15s;
 }
 
-.tool-btn:hover,
 .tool-btn.is-open {
   background: var(--surface-2);
   border-color: var(--line-strong);
+}
+
+@media (hover: hover) {
+  .tool-btn:hover {
+    background: var(--surface-2);
+    border-color: var(--line-strong);
+  }
+
+  /* A button that's "on" keeps its tint and just gets a touch darker. */
+  .tool-btn.is-on:hover {
+    background: color-mix(in oklab, var(--accent) 22%, var(--surface));
+    border-color: transparent;
+  }
 }
 
 .tool-btn.is-on {
@@ -1241,7 +1527,7 @@ kbd {
   text-overflow: ellipsis;
 }
 
-/* The single cards-or-list button is for phones; big screens show both choices. */
+/* The single view button is for phones; big screens show all three choices. */
 .view-cycle {
   display: none;
 }
@@ -1316,10 +1602,15 @@ kbd {
   white-space: nowrap;
 }
 
-.menu-option:hover,
 .menu-option:focus-visible {
   background: var(--surface-2);
   outline: none;
+}
+
+@media (hover: hover) {
+  .menu-option:hover {
+    background: var(--surface-2);
+  }
 }
 
 .menu-icon {
@@ -1403,8 +1694,10 @@ kbd {
   color: var(--muted);
 }
 
-.fp-chip:hover {
-  border-color: var(--line-strong);
+@media (hover: hover) {
+  .fp-chip:hover {
+    border-color: var(--line-strong);
+  }
 }
 
 .fp-chip[aria-pressed='true'] {
@@ -1466,8 +1759,10 @@ kbd {
   font-size: 13.5px;
 }
 
-.fp-tag:hover {
-  background: var(--accent-soft);
+@media (hover: hover) {
+  .fp-tag:hover {
+    background: var(--accent-soft);
+  }
 }
 
 .fp-tag[aria-pressed='true'] {
@@ -1510,9 +1805,10 @@ kbd {
   color: var(--text-3, var(--text-2));
 }
 
+/* As many cards as fit: 5 or 6 across on a big screen, 1 on a phone. */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(256px, 1fr));
   gap: 18px;
 }
 
@@ -1528,14 +1824,15 @@ kbd {
   /* After a long scroll there can be a thousand cards: the browser skips drawing the ones far off-screen. */
   content-visibility: auto;
   contain-intrinsic-size: auto 372px;
-  /* New cards (another filter, the next page) come in gently instead of popping. */
-  animation: fade-in 0.2s ease both;
 }
 
-.card:hover {
-  border-color: color-mix(in oklab, var(--hue) 45%, var(--line));
-  box-shadow: 0 18px 40px -20px color-mix(in oklab, var(--hue) 70%, transparent);
-  transform: translateY(-3px);
+/* A card lifts a little under the mouse. (Not on touch screens, where a tap would leave it lifted.) */
+@media (hover: hover) {
+  .card:hover {
+    border-color: color-mix(in oklab, var(--hue) 45%, var(--line));
+    box-shadow: 0 18px 40px -20px color-mix(in oklab, var(--hue) 70%, transparent);
+    transform: translateY(-3px);
+  }
 }
 
 .card:has(.card-open:focus-visible) {
@@ -1572,9 +1869,11 @@ kbd {
   font-size: 13.5px;
 }
 
-.btn-open:hover {
-  background: var(--accent);
-  color: var(--on-accent);
+@media (hover: hover) {
+  .btn-open:hover {
+    background: var(--accent);
+    color: var(--on-accent);
+  }
 }
 
 .price-pill {
@@ -1613,11 +1912,6 @@ kbd {
 
 .preview-picture.is-shown {
   opacity: 1;
-}
-
-/* A picture that turned out too small makes way for the band: it fades in too. */
-.preview-band > * {
-  animation: fade-in 0.25s ease both;
 }
 
 .preview-band {
@@ -1752,14 +2046,13 @@ kbd {
   opacity: 0.8;
 }
 
-/* The last results, while the new ones load: a soft fade (after a short wait, so a quick answer doesn't blink). */
+/* The last results, while the new ones load: a soft fade, kept light so the page doesn't seem to blink. */
 .results-body {
-  transition: opacity 0.2s;
+  transition: opacity 0.15s;
 }
 
 .results-body.is-stale {
-  opacity: 0.55;
-  transition-delay: 0.12s;
+  opacity: 0.7;
 }
 
 /* ---------- Selecting many links ---------- */
@@ -1847,10 +2140,12 @@ kbd {
   color: var(--danger);
 }
 
-.bulk-delete:hover:not(:disabled) {
-  background: var(--danger-soft);
-  border-color: transparent;
-  color: var(--danger);
+@media (hover: hover) {
+  .bulk-delete:hover:not(:disabled) {
+    background: var(--danger-soft);
+    border-color: transparent;
+    color: var(--danger);
+  }
 }
 
 .btn-ghost:disabled {
@@ -1877,12 +2172,13 @@ kbd {
   transition: border-color 0.15s, box-shadow 0.15s;
   content-visibility: auto;
   contain-intrinsic-size: auto 84px;
-  animation: fade-in 0.2s ease both;
 }
 
-.row:hover {
-  border-color: color-mix(in oklab, var(--hue) 45%, var(--line));
-  box-shadow: 0 10px 28px -20px color-mix(in oklab, var(--hue) 70%, transparent);
+@media (hover: hover) {
+  .row:hover {
+    border-color: color-mix(in oklab, var(--hue) 45%, var(--line));
+    box-shadow: 0 10px 28px -20px color-mix(in oklab, var(--hue) 70%, transparent);
+  }
 }
 
 .row:has(.card-open:focus-visible) {
@@ -2631,9 +2927,11 @@ dialog::backdrop {
   text-align: left;
 }
 
-.similar button:hover {
-  border-color: var(--line-strong);
-  background: var(--surface-2);
+@media (hover: hover) {
+  .similar button:hover {
+    border-color: var(--line-strong);
+    background: var(--surface-2);
+  }
 }
 
 .similar strong {
@@ -2872,9 +3170,11 @@ mark {
   flex: none;
 }
 
-button.star-btn:hover {
-  background: var(--surface-2);
-  color: var(--text);
+@media (hover: hover) {
+  button.star-btn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
 }
 
 .star-btn.is-on {
@@ -3025,9 +3325,11 @@ button.star-btn:hover {
   text-decoration: none;
 }
 
-.page-links a:hover {
-  border-color: var(--line-strong);
-  background: var(--surface-2);
+@media (hover: hover) {
+  .page-links a:hover {
+    border-color: var(--line-strong);
+    background: var(--surface-2);
+  }
 }
 
 .page-links svg {
@@ -3120,9 +3422,13 @@ button.star-btn:hover {
   -webkit-line-clamp: 5;
 }
 
-/* ---------- Phones ---------- */
+/* ---------- Tablets and phones ---------- */
 
 @media (max-width: 960px) {
+  .container {
+    padding: 0 24px;
+  }
+
   .page {
     grid-template-columns: minmax(0, 1fr);
     grid-template-rows: none;
@@ -3152,6 +3458,15 @@ button.star-btn:hover {
   .has-search .brand-text {
     display: none;
   }
+
+  /* Less room for the category row here: the "All categories" button is just its icon (with a tooltip). */
+  .cat-picker-btn {
+    padding: 0;
+  }
+
+  .cat-picker-btn .tool-label {
+    display: none;
+  }
 }
 
 @media (max-width: 640px) {
@@ -3170,10 +3485,6 @@ button.star-btn:hover {
 
   .header-row {
     gap: 10px;
-  }
-
-  .brand-count {
-    display: none;
   }
 
   /* Long names wrap onto a second line instead of being cut off. */
@@ -3344,8 +3655,21 @@ button.star-btn:hover {
     padding: 0 10px;
   }
 
+  /* The split Filters button: the words take the room, the × stays a square. */
+  .filters-drop.is-split > .tool-btn:first-child {
+    width: auto;
+    flex: 1;
+  }
+
+  .toolbar-tools > .filters-drop > .filters-clear {
+    width: 38px;
+    flex: none;
+    padding: 0;
+  }
+
   /* Buttons with only an icon get square. The Sort button drops its icon to make room for its words. */
-  .toolbar-tools > .tool-btn {
+  .toolbar-tools > .tool-btn,
+  .cat-picker-btn {
     padding: 0;
   }
 
@@ -3359,6 +3683,37 @@ button.star-btn:hover {
 
   .view-cycle {
     display: inline-flex;
+  }
+
+  /* The chips row sits inside the toolbar's frame here, since the bar doesn't stick. */
+  .active-filters {
+    padding: 8px 4px 0;
+  }
+
+  /* The categories window is a sheet here: the find box on top, the grid scrolls, two columns. */
+  .cat-pop {
+    width: auto;
+    max-width: none;
+    margin: 0;
+    overflow: hidden;
+    padding: 6px 0 0;
+  }
+
+  .cat-pop .sheet-head {
+    padding: 4px 10px 6px 18px;
+  }
+
+  .cat-pop-inner {
+    max-height: calc(85dvh - 60px);
+  }
+
+  .cat-find {
+    margin: 0 10px 4px;
+  }
+
+  .cat-grid {
+    grid-template-columns: 1fr 1fr;
+    padding: 6px 10px calc(10px + env(safe-area-inset-bottom));
   }
 
   /* Menus and the Filters panel slide up from the bottom of the screen, with the page dimmed behind. */

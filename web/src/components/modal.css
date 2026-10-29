@@ -1,0 +1,110 @@
+/* Pop-up windows (Modal.jsx): a soft fade-and-grow when they open, a blurred page behind them,
+   and a header with the title, an optional line under it and the close button. */
+
+.modal {
+  box-shadow: var(--shadow), 0 24px 60px rgb(20 24 43 / 0.18);
+}
+
+:root[data-theme='dark'] .modal {
+  border-color: var(--line-strong);
+  box-shadow: var(--shadow), 0 24px 60px rgb(0 0 0 / 0.5);
+}
+
+.modal.modal-sm {
+  width: min(440px, calc(100vw - 32px));
+}
+
+.modal.modal-lg {
+  width: min(860px, calc(100vw - 32px));
+}
+
+.modal[open] {
+  animation: modal-in 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.modal[open]::backdrop {
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  animation: modal-backdrop-in 0.18s ease-out;
+}
+
+.modal.is-closing {
+  animation: modal-out 0.16s ease-in forwards;
+  pointer-events: none;
+}
+
+.modal.is-closing::backdrop {
+  animation: modal-backdrop-out 0.16s ease-in forwards;
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes modal-out {
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.98);
+  }
+}
+
+@keyframes modal-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* Header: title (and a line under it) on the left, close button in the corner */
+.modal .modal-head {
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.modal-titles {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.modal-titles h2 {
+  overflow-wrap: anywhere;
+}
+
+.modal-desc {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.modal .modal-close {
+  margin: -6px -8px 0 0;
+}
+
+@media (hover: hover) {
+  .modal .modal-close:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+}
+
+@media (max-width: 640px) {
+  .modal .modal-head {
+    margin-bottom: 14px;
+  }
+
+  .modal .modal-close {
+    margin: -4px -6px 0 0;
+  }
+}

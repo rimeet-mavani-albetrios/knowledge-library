@@ -1,0 +1,44 @@
+/* The "save button for your browser" window (SaveButtonDialog.jsx): the drag-me button sits in a dashed box
+   so it reads as something you pick up. */
+
+.save-button-dialog .drag-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+  margin-top: 10px;
+  padding: 14px 16px;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+
+.save-button-dialog .bookmarklet {
+  margin: 0;
+  cursor: grab;
+}
+
+.save-button-dialog .bookmarklet:active {
+  cursor: grabbing;
+}
+
+.save-button-dialog .drag-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.save-button-dialog .save-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  line-height: 1.5;
+}
+
+.save-button-dialog .save-note svg {
+  flex: none;
+  margin-top: 2px;
+}

@@ -7,6 +7,8 @@ import './styles.css';
 import App from './App.jsx';
 import SavePage from './components/SavePage.jsx';
 import { ToastProvider } from './components/Toasts.jsx';
+import { ConfirmProvider } from './components/Confirm.jsx';
+import TooltipLayer from './components/Tooltip.jsx';
 
 // The "Save to library" button opens /save in a small window.
 const Page = window.location.pathname === '/save' ? SavePage : App;
@@ -23,7 +25,11 @@ createRoot(document.getElementById('root')).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
-        <Page />
+        <ConfirmProvider>
+          <Page />
+          {/* Our own tooltips in place of the browser's `title` boxes, once for the whole app. */}
+          <TooltipLayer />
+        </ConfirmProvider>
       </ToastProvider>
     </QueryClientProvider>
   </StrictMode>,

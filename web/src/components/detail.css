@@ -1,0 +1,969 @@
+/* The link detail window (LinkDrawer.jsx): a window in the middle of the screen with two columns that scroll
+   on their own, so almost nothing needs scrolling. The old side-panel rules (.drawer*) in styles.css are unused. */
+
+/* ---------- The window ---------- */
+
+/* The <dialog> itself is a see-through frame: the arrows that float beside the window on wide screens
+   live in it, outside the visible window, so it must not clip or paint anything. */
+.detail {
+  width: min(1120px, 100vw - 48px);
+  max-width: none;
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 0;
+  background: transparent;
+  overflow: visible;
+}
+
+.detail[open] {
+  animation: detail-in 0.18s ease-out;
+}
+
+.detail[open]::backdrop {
+  animation: detail-fade 0.18s ease-out;
+}
+
+@keyframes detail-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+}
+
+@keyframes detail-fade {
+  from {
+    opacity: 0;
+  }
+}
+
+.detail-window {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 48px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 32px 80px -24px rgb(10 12 24 / 0.45), var(--shadow);
+  overflow: hidden;
+}
+
+/* While the next link loads, the one on screen fades a little and a thin bar runs along the top: no blink. */
+.detail-progress {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  height: 3px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.detail-progress::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 40%;
+  border-radius: 999px;
+  background: var(--accent);
+  animation: detail-progress 1s ease-in-out infinite;
+}
+
+@keyframes detail-progress {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(250%);
+  }
+}
+
+.detail-body {
+  transition: opacity 0.15s;
+}
+
+.detail-window[aria-busy='true'] .detail-body {
+  opacity: 0.6;
+}
+
+/* ---------- Top bar: position in the results, arrows, close ---------- */
+
+.detail-top {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 10px;
+  height: 52px;
+  padding: 0 10px 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.detail-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.detail-pos {
+  min-width: 72px;
+  text-align: center;
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.detail-pos span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.detail-close {
+  margin-left: auto;
+}
+
+/* ---------- Two columns ---------- */
+
+.detail-body {
+  display: grid;
+  flex: 1 1 auto;
+  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+}
+
+.detail-main,
+.detail-side {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.detail-main {
+  padding: 20px 28px 36px;
+}
+
+.detail-side {
+  padding: 22px 26px 32px;
+  border-left: 1px solid var(--line);
+  background: color-mix(in oklab, var(--surface-2) 55%, var(--surface));
+}
+
+/* ---------- Left: the website ---------- */
+
+/* The picture keeps its colored "mat" from the cards, but wider and never taller than a quarter of the screen. */
+.detail-hero .preview {
+  aspect-ratio: 2.5;
+  max-height: 240px;
+  margin: 0;
+  padding: 7px;
+  border-radius: 16px;
+}
+
+.detail-hero .preview-picture {
+  border-radius: 10px;
+}
+
+.detail-pills {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.detail-title {
+  margin: 10px 0 0;
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.detail-where {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.detail-where > * + *::before {
+  content: '·';
+  margin: 0 8px;
+  color: var(--line-strong);
+}
+
+.detail-url {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  color: var(--text-2);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.detail-url svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.detail-host {
+  color: var(--accent-text);
+}
+
+.detail-path {
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--muted);
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 18px 0 0;
+}
+
+.detail-actions .btn-primary {
+  margin-right: 6px;
+}
+
+.detail-actions .star-btn {
+  width: 38px;
+  height: 38px;
+  margin: 0;
+  border-radius: 10px;
+}
+
+.detail-copied {
+  color: var(--success);
+}
+
+.detail-status {
+  margin-top: 16px;
+}
+
+.detail-status-pill {
+  margin-top: 16px;
+}
+
+.detail-summary {
+  margin: 18px 0 0;
+  font-size: 15.5px;
+  line-height: 1.6;
+}
+
+.detail-match {
+  display: flex;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.detail-match svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.detail-use {
+  margin: 12px 0 0;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+/* Section titles read like the small labels on a map. */
+.detail-section {
+  margin-top: 26px;
+}
+
+.detail-section h3 {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.detail-side .detail-section:first-child {
+  margin-top: 0;
+}
+
+.detail-note {
+  margin: 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--accent);
+  color: var(--text-2);
+  line-height: 1.55;
+  white-space: pre-line; /* notes imported from a spreadsheet keep one line per detail */
+}
+
+.detail-tasks,
+.detail-features {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.detail-tasks li,
+.detail-features li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  line-height: 1.45;
+}
+
+.detail-tasks li {
+  font-weight: 500;
+}
+
+.detail-tasks svg {
+  flex: none;
+  margin-top: 4px;
+  color: var(--accent);
+}
+
+.detail-features svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--success);
+}
+
+.detail-link-btn {
+  margin-top: 10px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.detail-steps {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.detail-steps li {
+  position: relative;
+  min-height: 24px;
+  padding-left: 36px;
+  line-height: 1.5;
+  counter-increment: step;
+}
+
+.detail-steps li::before {
+  content: counter(step);
+  position: absolute;
+  top: 0;
+  left: 0;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.detail-overview,
+.detail-audience {
+  margin: 0;
+  color: var(--text-2);
+  line-height: 1.6;
+}
+
+.detail-audience {
+  margin-top: 10px;
+}
+
+.detail-audience strong {
+  color: var(--text);
+}
+
+/* ---------- Right: similar links, tags, facts ---------- */
+
+.detail-similar {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Each row carries its category color as a thin bar on the left and behind its icon. */
+.detail-similar button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 9px 10px 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--hue);
+  color: var(--text);
+  text-align: left;
+  transition: border-color 0.15s;
+}
+
+.detail-similar .row-icon {
+  width: 38px;
+  height: 38px;
+}
+
+.detail-similar-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.detail-similar-text strong {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-similar-text span {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-similar-go {
+  color: var(--line-strong);
+  transition: color 0.15s, transform 0.15s;
+}
+
+.detail-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.detail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-tag {
+  padding: 4px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 500;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.detail-facts {
+  display: grid;
+  grid-template-columns: 82px minmax(0, 1fr);
+  gap: 9px 12px;
+  margin: 0;
+  font-size: 13.5px;
+}
+
+.detail-facts dt {
+  color: var(--muted);
+}
+
+.detail-facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.detail-facts dd svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.detail-sub {
+  width: 100%;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Important links, the website's headings and the pages read: folded, because you rarely need them. */
+.detail-more {
+  margin-top: 24px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.detail-more summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.detail-more summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-more summary svg {
+  transition: transform 0.15s;
+}
+
+.detail-more[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.detail-more .detail-section {
+  margin-top: 18px;
+}
+
+.detail-page-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.detail-page-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.detail-page-links svg {
+  color: var(--muted);
+}
+
+.detail-headings {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+
+.detail-headings li::marker {
+  color: var(--line-strong);
+}
+
+.detail-pages {
+  display: grid;
+  gap: 5px;
+}
+
+.detail-pages a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-2);
+  font-size: 13.5px;
+  text-decoration: none;
+}
+
+.detail-pages svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.detail-words {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* ---------- Editing ---------- */
+
+.detail-form {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.detail-form-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.detail-form-head h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.detail-form-head .hint {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail-form label,
+.detail-field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.detail-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.detail-form .field-error {
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.detail-form .input[aria-invalid='true'] {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.detail-form .form-actions {
+  margin-top: 6px;
+}
+
+/* The category dropdown as a form field: full width, like the boxes around it. (Phones keep the bottom sheet.) */
+.detail-dropdown .tool-btn {
+  width: 100%;
+  height: 42px;
+  justify-content: flex-start;
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.detail-dropdown .tool-label {
+  flex: 1;
+  text-align: left;
+}
+
+@media (min-width: 641px) {
+  .detail-dropdown .popover {
+    right: auto;
+    left: 0;
+    width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+  }
+}
+
+/* ---------- Loading and errors ---------- */
+
+.detail-skeleton {
+  display: grid;
+  gap: 14px;
+}
+
+.detail-skeleton span {
+  display: block;
+  border-radius: 8px;
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--line) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+  animation: detail-shimmer 1.4s ease-in-out infinite;
+}
+
+.detail-skeleton .is-hero {
+  aspect-ratio: 2.5;
+  max-height: 240px;
+  border-radius: 16px;
+}
+
+.detail-skeleton .is-pill {
+  width: 110px;
+  height: 22px;
+  border-radius: 999px;
+}
+
+.detail-skeleton .is-title {
+  width: 70%;
+  height: 28px;
+}
+
+.detail-skeleton .is-text {
+  height: 13px;
+}
+
+.detail-skeleton .is-short {
+  width: 55%;
+}
+
+.detail-skeleton .is-row {
+  height: 58px;
+  border-radius: 14px;
+}
+
+@keyframes detail-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+.detail-error {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  padding: 40px 0;
+  color: var(--text-2);
+}
+
+.detail-error svg {
+  color: var(--danger);
+}
+
+.detail-error p {
+  margin: 0;
+}
+
+/* ---------- Arrows floating beside the window (wide screens only) ---------- */
+
+.detail-float {
+  position: absolute;
+  top: 50%;
+  display: none;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  translate: 0 -50%;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.detail-float-prev {
+  left: -76px;
+}
+
+.detail-float-next {
+  right: -76px;
+}
+
+.detail-float:disabled {
+  opacity: 0.35;
+}
+
+@media (min-width: 1280px) {
+  .detail-float {
+    display: grid;
+  }
+}
+
+/* ---------- Hover ---------- */
+
+@media (hover: hover) {
+  .detail-url:hover .detail-host {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .detail-similar button:hover {
+    border-color: var(--line-strong);
+  }
+
+  .detail-similar button:hover .detail-similar-go {
+    color: var(--text-2);
+    transform: translateX(2px);
+  }
+
+  .detail-tag:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+
+  .detail-page-links a:hover {
+    border-color: var(--line-strong);
+    background: var(--surface-2);
+  }
+
+  .detail-pages a:hover {
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .detail-float:hover:not(:disabled) {
+    border-color: var(--line-strong);
+    background: var(--surface-2);
+  }
+}
+
+/* ---------- Tablets: one column, the window scrolls as a whole ---------- */
+
+@media (max-width: 960px) {
+  .detail-body {
+    display: block;
+    overflow-y: auto;
+  }
+
+  .detail-main,
+  .detail-side {
+    overflow: visible;
+    scrollbar-gutter: auto;
+  }
+
+  .detail-main {
+    padding: 18px 24px 30px;
+  }
+
+  .detail-side {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
+/* ---------- Phones: a full-screen sheet with the bar on top ---------- */
+
+@keyframes detail-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+@media (max-width: 640px) {
+  .detail {
+    width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+  }
+
+  .detail[open] {
+    animation-name: detail-up;
+  }
+
+  .detail-window {
+    height: 100%;
+    max-height: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .detail-top {
+    height: calc(56px + env(safe-area-inset-top));
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .detail-main {
+    padding: 14px 16px 26px;
+  }
+
+  .detail-side {
+    padding: 20px 16px calc(28px + env(safe-area-inset-bottom));
+  }
+
+  .detail-hero .preview {
+    aspect-ratio: 2;
+    max-height: 200px;
+    border-radius: 14px;
+  }
+
+  .detail-title {
+    font-size: 22px;
+  }
+
+  .detail-path {
+    max-width: 140px;
+  }
+
+  /* The pieces of the website line wrap onto their own lines here, so the dots between them go. */
+  .detail-where {
+    gap: 2px 14px;
+  }
+
+  .detail-where > * + *::before {
+    content: none;
+  }
+
+  .detail-actions .btn-primary {
+    flex: 1 1 auto;
+  }
+
+  .detail-form-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* The global reduced-motion rule already stops the animations; the moving bar becomes a still one. */
+@media (prefers-reduced-motion: reduce) {
+  .detail-progress::before {
+    width: 100%;
+    opacity: 0.5;
+    animation: none;
+  }
+
+  .detail-skeleton span {
+    animation: none;
+  }
+}

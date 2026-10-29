@@ -1,0 +1,173 @@
+/* The hover peek (Peek.jsx): one floating panel with a link's picture, summary, uses and tags.
+   It floats over the page (above the sticky top bar and toolbar, under menus, toasts and dialogs). */
+
+.peek {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  max-width: calc(100vw - 24px);
+  background: var(--surface);
+  border: 1px solid color-mix(in oklab, var(--hue) 35%, var(--line));
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow), 0 24px 48px -24px color-mix(in oklab, var(--hue) 60%, transparent);
+  overflow: hidden;
+  animation: peek-in 0.15s ease-out both;
+  transform-origin: left top;
+}
+
+/* It grows out from the side the item is on. */
+.peek[data-side='left'] {
+  transform-origin: right top;
+}
+
+.peek[data-side='above'] {
+  transform-origin: left bottom;
+}
+
+@keyframes peek-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+/* The picture, 16:9, in its colored frame like on a card. */
+.peek .preview {
+  aspect-ratio: 16 / 9;
+  margin: 8px 8px 0;
+}
+
+.peek-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px 4px;
+}
+
+.peek-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.peek-title {
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.peek-host {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.peek-star {
+  display: inline-grid;
+  place-items: center;
+  color: #e8a200;
+}
+
+.peek-star svg {
+  fill: currentColor;
+}
+
+.peek-stars {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.peek-summary {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-2);
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.peek-use h4 {
+  margin: 0 0 3px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.peek-use p,
+.peek-use ul {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.peek-use p {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.peek-use ul {
+  padding-left: 18px;
+}
+
+.peek-use li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.peek-use li::first-letter {
+  text-transform: uppercase;
+}
+
+.peek-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 13px;
+  color: var(--accent-text);
+}
+
+.peek-tags .more {
+  color: var(--muted);
+}
+
+.peek-date {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.peek-foot {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 14px;
+}
+
+.peek-foot .btn {
+  flex: 1;
+  height: 36px;
+  font-size: 14px;
+}

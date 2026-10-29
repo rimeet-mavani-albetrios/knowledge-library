@@ -115,7 +115,6 @@ export default function Header({ me, search, onAdd, onLogin, onLogout, onSaveBut
           <LogoMark />
           <div className="brand-text">
             <h1>{me?.title ?? 'Knowledge Library'}</h1>
-            {me && <span className="brand-count">{me.total.toLocaleString()} links</span>}
           </div>
         </a>
         {search && <div className="header-search">{search}</div>}

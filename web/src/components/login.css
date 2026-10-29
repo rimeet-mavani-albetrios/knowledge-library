@@ -1,0 +1,100 @@
+/* The login form (LoginDialog.jsx): the password box with its eye button, the mistake under it,
+   and a little shake when something is wrong. */
+
+.login-form {
+  gap: 16px;
+}
+
+.login-field {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.login-box {
+  position: relative;
+}
+
+.login-box .input {
+  height: 44px;
+  padding-right: 48px;
+}
+
+.login-form .input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.login-form .input[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.login-eye {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+
+.login-eye[aria-pressed='true'] {
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+.login-form .field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 2px 0 0;
+  color: var(--danger);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.login-form .field-error svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.login-form .login-submit {
+  width: 100%;
+  height: 44px;
+}
+
+.login-form.is-shaking {
+  animation: login-shake 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes login-shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+
+  30%,
+  50%,
+  70% {
+    transform: translateX(-4px);
+  }
+
+  40%,
+  60% {
+    transform: translateX(4px);
+  }
+}
+
+@media (hover: hover) {
+  .login-eye:hover {
+    color: var(--text);
+  }
+}

@@ -59,7 +59,8 @@ export function Dropdown({ title, value, options, onChange, icon: ButtonIcon, cl
   const close = useCallback(() => setOpen(false), []);
   const button = useRef(null);
   const list = useRef(null);
-  const current = options.find(option => option.value === value) ?? options[0];
+  // No options at all (a list still loading, say): the button shows the title and opens an empty list.
+  const current = options.find(option => option.value === value) ?? options[0] ?? { value, label: title };
 
   // Opening puts the focus on the chosen option, so ↑ ↓ start from there.
   useEffect(() => {

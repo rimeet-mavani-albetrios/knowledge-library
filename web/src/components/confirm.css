@@ -1,0 +1,87 @@
+/* The "are you sure?" window (Confirm.jsx): an icon in a colored square (red for dangerous things),
+   the question and its explanation beside it, and the buttons on the right. */
+
+.confirm-body {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 16px;
+  align-items: start;
+}
+
+.confirm-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.confirm-dialog.is-danger .confirm-icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.confirm-text {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 2px;
+}
+
+.confirm-text h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.confirm-text p {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.confirm-body .form-actions {
+  grid-column: 1 / -1;
+  margin-top: 18px;
+}
+
+.confirm-body .btn {
+  min-width: 96px;
+}
+
+.confirm-dialog .btn-danger {
+  transition: background-color 0.15s, filter 0.15s;
+}
+
+@media (hover: hover) {
+  .confirm-dialog .btn-danger:hover {
+    filter: brightness(0.92);
+  }
+
+  :root[data-theme='dark'] .confirm-dialog .btn-danger:hover {
+    filter: brightness(1.08);
+  }
+}
+
+@media (max-width: 640px) {
+  .confirm-body {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .confirm-body .form-actions {
+    flex-wrap: nowrap;
+    margin-top: 12px;
+  }
+
+  .confirm-body .btn {
+    flex: 1;
+    min-width: 0;
+  }
+}

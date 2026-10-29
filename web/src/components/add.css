@@ -1,0 +1,695 @@
+/* The "Add links" window (AddDialog.jsx): the paste box with its file strip, the links found, the optional
+   details, and the progress screen after adding. Shares .progress-list, .bar, .form-actions with styles.css. */
+
+.modal.add-dialog {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.add-form {
+  display: grid;
+  gap: 22px;
+}
+
+/* ---------- Sections ---------- */
+
+.add-section {
+  display: grid;
+  gap: 10px;
+}
+
+.add-details {
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.add-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+  min-height: 22px;
+}
+
+.add-section-title {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.add-optional {
+  font-family: var(--font);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* "3 links found · 1 already saved · 2 lines are not links" */
+.add-detect {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.add-detect strong {
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+.add-detect span::before {
+  content: '·';
+  margin: 0 7px;
+  color: var(--line-strong);
+}
+
+/* ---------- The paste box: textarea + file strip in one bordered frame ---------- */
+
+.paste-box {
+  position: relative;
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.paste-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.paste-box.is-invalid {
+  border-color: var(--danger);
+}
+
+.paste-box.is-invalid:focus-within {
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.paste-box .links-input {
+  min-height: 150px;
+  border: 0;
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: transparent;
+  padding: 12px 14px;
+  font-size: 14.5px;
+}
+
+.paste-box .links-input:hover,
+.paste-box .links-input:focus {
+  border: 0;
+  box-shadow: none;
+}
+
+.file-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 14px;
+  min-height: 42px;
+  padding: 7px 10px 7px 14px;
+  border-top: 1px dashed var(--line-strong);
+  border-radius: 0 0 var(--radius) var(--radius);
+  background: var(--surface-2);
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+.file-strip-text {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  min-width: 0;
+}
+
+.file-strip-text svg {
+  color: var(--muted);
+}
+
+.file-strip-types {
+  color: var(--muted);
+}
+
+.file-strip-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex: none;
+  min-height: 28px;
+  padding: 0 6px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* The chosen file, with × to take it out again */
+.file-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+  height: 28px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.file-chip svg {
+  flex: none;
+  color: var(--accent-text);
+}
+
+.file-chip-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.file-chip-meta {
+  flex: none;
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.file-chip.is-bad {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.file-chip.is-bad svg {
+  color: var(--danger);
+}
+
+.file-chip-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+
+/* Shown over the box while a file is dragged across it */
+.paste-drop {
+  position: absolute;
+  inset: 0;
+  display: none;
+  place-items: center;
+  align-content: center;
+  gap: 8px;
+  border-radius: inherit;
+  background: color-mix(in oklab, var(--accent-soft) 88%, var(--surface));
+  color: var(--accent-text);
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.paste-box.is-dragging {
+  border-color: var(--accent);
+  border-style: dashed;
+}
+
+.paste-box.is-dragging .paste-drop {
+  display: grid;
+}
+
+/* A short shake when Add is pressed with nothing to add. Reduced motion turns it off (global rule). */
+.paste-box.is-shaking {
+  animation: paste-shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes paste-shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(2px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-4px);
+  }
+  40%,
+  60% {
+    transform: translateX(4px);
+  }
+}
+
+/* Our own message under a field (never the browser's bubble) */
+.add-dialog .field-error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: -2px 0 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--danger);
+  line-height: 1.4;
+}
+
+.add-dialog .field-error svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.add-dialog .folders-found {
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ---------- The links found ---------- */
+
+.add-list {
+  max-height: 232px;
+}
+
+.add-list.found-rows li {
+  padding: 7px 6px 7px 10px;
+  gap: 10px;
+}
+
+.found-rows li.is-saved .found-name {
+  color: var(--text-2);
+}
+
+.found-name {
+  display: block;
+}
+
+.found-name strong {
+  font-weight: 600;
+}
+
+.found-saved {
+  flex: none;
+  background: color-mix(in oklab, var(--warning) 14%, var(--surface));
+  color: var(--warning);
+  font-size: 12px;
+}
+
+.found-remove {
+  color: var(--muted);
+}
+
+.found-more {
+  justify-content: center;
+}
+
+/* The host's first letter in a soft square */
+.host-mark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Lines that hold no link, folded away */
+.not-links summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  cursor: pointer;
+  list-style: none;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.not-links summary::-webkit-details-marker {
+  display: none;
+}
+
+.not-links summary svg {
+  transition: transform 0.15s;
+}
+
+.not-links[open] summary svg {
+  transform: rotate(180deg);
+}
+
+.not-links ul {
+  margin: 8px 0 0;
+  padding: 0 0 0 10px;
+  border-left: 2px solid var(--line);
+  list-style: none;
+  font-size: 13px;
+  color: var(--muted);
+  display: grid;
+  gap: 3px;
+}
+
+.not-links li {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Details: tags, collection, note ---------- */
+
+.details-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 16px;
+}
+
+.details-grid .wide {
+  grid-column: 1 / -1;
+}
+
+.details-field {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.details-field label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.details-field .hint {
+  font-size: 12.5px;
+}
+
+.details-field textarea.input {
+  min-height: 0;
+  line-height: 1.45;
+}
+
+/* The tag chips box, styled like .input */
+.tag-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  cursor: text;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.tag-input:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.tag-input-field {
+  flex: 1 1 90px;
+  min-width: 60px;
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.tag-input-field:focus {
+  outline: none;
+}
+
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  height: 28px;
+  padding: 0 3px 0 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  animation: chip-in 0.15s ease-out;
+}
+
+@keyframes chip-in {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+}
+
+.tag-chip-remove {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  opacity: 0.75;
+}
+
+/* ---------- Server error, with a way back ---------- */
+
+.add-error-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in oklab, var(--danger) 35%, var(--line));
+  border-radius: var(--radius);
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.add-error-box span {
+  flex: 1 1 200px;
+  color: var(--text);
+}
+
+.add-error-box .btn {
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13.5px;
+}
+
+/* ---------- Footer ---------- */
+
+.add-actions {
+  margin-top: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.add-foot {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-right: auto;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.add-foot svg {
+  flex: none;
+  color: var(--accent-text);
+}
+
+.add-submit {
+  min-width: 118px;
+}
+
+/* ---------- After adding ---------- */
+
+.add-progress {
+  display: grid;
+  gap: 16px;
+}
+
+.progress-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.progress-mark {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.progress-head.is-done .progress-mark {
+  background: color-mix(in oklab, var(--success) 16%, var(--surface));
+  color: var(--success);
+}
+
+.progress-title {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  font-variant-numeric: tabular-nums;
+}
+
+.progress-title:focus {
+  outline: none; /* it only takes the focus so the summary is read out */
+}
+
+.progress-sub {
+  margin: 3px 0 0;
+  font-size: 14px;
+  color: var(--text-2);
+  line-height: 1.45;
+}
+
+.progress-track {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.progress-track .bar {
+  flex: 1;
+}
+
+.add-progress .progress-count {
+  flex: none;
+  margin: 0;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.add-progress .add-list {
+  max-height: 300px;
+}
+
+/* ---------- Hover ---------- */
+
+@media (hover: hover) {
+  .paste-box:hover:not(:focus-within):not(.is-invalid) {
+    border-color: var(--line-strong);
+  }
+
+  .tag-input:hover:not(:focus-within) {
+    border-color: var(--line-strong);
+  }
+
+  .file-strip-pick:hover {
+    background: var(--surface);
+    text-decoration: none;
+  }
+
+  .file-chip-remove:hover,
+  .tag-chip-remove:hover {
+    background: color-mix(in oklab, currentColor 14%, transparent);
+    opacity: 1;
+  }
+
+  .found-remove:hover:not(:disabled) {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+}
+
+/* ---------- Phones: a full-screen sheet ---------- */
+
+@media (max-width: 640px) {
+  .modal.add-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .add-dialog .modal-inner {
+    min-height: 100%;
+    padding: 16px 16px 28px;
+  }
+
+  .add-form {
+    gap: 18px;
+  }
+
+  .add-section-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .paste-box .links-input {
+    min-height: 130px;
+    font-size: 16px; /* phones zoom in on smaller text */
+  }
+
+  .file-strip {
+    padding: 8px 10px 8px 12px;
+  }
+
+  /* One short row on phones: the file types show in the picker anyway */
+  .file-strip-types {
+    display: none;
+  }
+
+  .details-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tag-input-field,
+  .details-field .input {
+    font-size: 16px;
+  }
+
+  .add-actions {
+    flex-wrap: wrap;
+  }
+
+  .add-foot {
+    flex-basis: 100%;
+    margin: 0 0 4px;
+  }
+
+  .add-actions .btn {
+    flex: 1;
+  }
+
+  .progress-title {
+    font-size: 18px;
+  }
+}
