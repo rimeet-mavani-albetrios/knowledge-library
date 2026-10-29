@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUp, Lock } from 'lucide-react';
 import { api } from './api.js';
@@ -18,6 +18,15 @@ import SaveButtonDialog from './components/SaveButtonDialog.jsx';
 import LoginDialog, { LoginForm } from './components/LoginDialog.jsx';
 import { LogoMark } from './components/Icons.jsx';
 import { useToast } from './components/Toasts.jsx';
+
+// The Stats page and its world map load only when you open it, so the library itself stays fast.
+const loadStats = () => import('./components/StatsPage.jsx');
+const StatsPage = lazy(loadStats);
+// The filters a click on the Stats page starts from: only the country (or category, or broken links) it was about.
+const NO_FILTERS = {
+  q: '', exact: false, category: '', source: '', collection: '', tag: '', level: '', status: '', favorite: false, free: false, broken: false,
+  country: '', trust: false,
+};
 
 function BackToTop() {
   const [show, setShow] = useState(false);
@@ -68,10 +77,10 @@ export default function App() {
   paramsRef.current = params;
   // The search and filters without the open windows: opening or closing a link's details or the compare window
   // doesn't touch the map, the toolbar or the list, so they aren't drawn again then.
-  const { q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort } = params;
+  const { q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort, country, trust } = params;
   const browse = useMemo(
-    () => ({ q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort, link: '', compare: '' }),
-    [q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort],
+    () => ({ q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort, country, trust, link: '', compare: '' }),
+    [q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort, country, trust],
   );
   const [addOpen, setAddOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
@@ -159,6 +168,48 @@ export default function App() {
     lastResultsKey.current = resultsKey;
     scrollToResults();
   }, [resultsKey]);
+
+  // ---------- The Stats page: a step of its own, so Back goes back to the library ----------
+  // The library stays on the page (hidden) while Stats is open, so it comes back as it was, at the same place.
+  // A click on the Stats page (a country, a category) shows the library with only that filter on, as a new step:
+  // Back from there returns to the Stats page.
+  const statsOpen = Boolean(params.stats);
+  const libraryPlace = useRef(null); // { y, key }: where you were in the library, and its filters
+  const pickedOnStats = useRef(false);
+  const statsReady = useCallback(() => {
+    loadStats().then(module => queryClient.prefetchQuery(module.statsQuery));
+  }, [queryClient]);
+  const openStats = useCallback(() => {
+    const now = paramsRef.current;
+    if (now.stats) return;
+    libraryPlace.current = { y: window.scrollY, key: JSON.stringify(linkFilters(now)) };
+    setParams({ stats: true, link: '', compare: '' }, 'stats');
+  }, [setParams]);
+  const closeStats = useCallback(() => {
+    if (!paramsRef.current.stats) return;
+    if (window.history.state?.step === 'stats') window.history.back();
+    else setParams({ stats: false });
+  }, [setParams]);
+  const showFromStats = useCallback(
+    changes => {
+      pickedOnStats.current = true;
+      setParams({ ...NO_FILTERS, ...changes, stats: false, link: '' }, 'stats-pick');
+    },
+    [setParams],
+  );
+  const wasStats = useRef(statsOpen);
+  useLayoutEffect(() => {
+    if (wasStats.current === statsOpen) return;
+    wasStats.current = statsOpen;
+    if (statsOpen) {
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      return;
+    }
+    const place = libraryPlace.current;
+    if (pickedOnStats.current) requestAnimationFrame(() => scrollToResults('top'));
+    else if (place?.key === JSON.stringify(linkFilters(paramsRef.current))) window.scrollTo({ top: place.y, behavior: 'instant' });
+    pickedOnStats.current = false;
+  }, [statsOpen]);
 
   // Opening a link's details is a step of its own, so the Back button closes them again.
   // Opening one of a search's results means the search was worth keeping in your recent searches.
@@ -263,13 +314,16 @@ export default function App() {
       </a>
       <Header
         me={me.data}
-        search={stuck && <SearchBar ref={topSearchRef} compact {...searchBox} />}
+        search={stuck && !statsOpen && <SearchBar ref={topSearchRef} compact {...searchBox} />}
+        statsOpen={statsOpen}
+        onStats={statsOpen ? closeStats : openStats}
+        onStatsReady={statsReady}
         onAdd={() => setAddOpen(true)}
         onLogin={() => setLoginOpen(true)}
         onLogout={() => logout.mutate()}
         onSaveButton={() => setSaveButtonOpen(true)}
       />
-      <main className="container page" id="links">
+      <main className="container page" id="links" style={statsOpen ? { display: 'none' } : undefined}>
         <section className="hero" aria-label="Search">
           <h2 className="hero-title">Find anything you saved by saying what you want to do.</h2>
           <SearchBar ref={searchRef} {...searchBox} />
@@ -305,12 +359,17 @@ export default function App() {
           />
         </div>
       </main>
+      {statsOpen ? (
+        <Suspense fallback={null}>
+          <StatsPage owner={owner} onBack={closeStats} onShow={showFromStats} onOpenLink={openLink} />
+        </Suspense>
+      ) : null}
       <LinkDrawer
         id={params.link}
         q={params.q}
         owner={owner}
         categories={me.data?.categories ?? []}
-        ids={ids}
+        ids={statsOpen ? [] : ids}
         onClose={closeLink}
         onOpen={openLink}
         onNearEnd={loadMore}

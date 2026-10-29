@@ -1,0 +1,193 @@
+/* The world map (WorldMap.jsx): grey land, and five shades of teal for the countries that have a number. */
+
+.world-map {
+  --wm-0: #e3e7ef;
+  --wm-1: #c6ebe3;
+  --wm-2: #8bd5c6;
+  --wm-3: #41b6a1;
+  --wm-4: #128f7a;
+  --wm-5: #07645a;
+  --wm-edge: var(--surface);
+  position: relative;
+  min-width: 0;
+}
+
+:root[data-theme='dark'] .world-map {
+  --wm-0: #272d47;
+  --wm-1: #18484c;
+  --wm-2: #1b6a63;
+  --wm-3: #209080;
+  --wm-4: #37b8a0;
+  --wm-5: #84e2cc;
+}
+
+.wm-svg,
+.wm-placeholder {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 960 / 421;
+}
+
+/* While the shapes load: a quiet, softly pulsing box of the same size, so nothing jumps when the map comes. */
+.wm-placeholder {
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 14px;
+  animation: wm-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes wm-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.wm-land,
+.wm-dot {
+  stroke: var(--wm-edge);
+  stroke-width: 0.6;
+  stroke-linejoin: round;
+  transition: fill 0.25s;
+}
+
+.wm-dot {
+  stroke-width: 1.4;
+}
+
+.wm-s0 {
+  fill: var(--wm-0);
+}
+.wm-s1 {
+  fill: var(--wm-1);
+}
+.wm-s2 {
+  fill: var(--wm-2);
+}
+.wm-s3 {
+  fill: var(--wm-3);
+}
+.wm-s4 {
+  fill: var(--wm-4);
+}
+.wm-s5 {
+  fill: var(--wm-5);
+}
+
+@media (hover: hover) {
+  .wm-land:hover {
+    stroke: var(--text);
+    stroke-width: 1;
+  }
+
+  .is-clickable .wm-land:not(.wm-s0):hover,
+  .is-clickable .wm-dot:hover {
+    cursor: pointer;
+    filter: brightness(1.08);
+  }
+}
+
+.wm-svg :focus {
+  outline: none;
+}
+
+.wm-svg :focus-visible {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+/* The label that follows the mouse: the app's tooltip look (ink color), above the pointer. */
+.wm-tip {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  gap: 1px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--text);
+  color: var(--bg);
+  font: 500 12.5px/1.35 var(--font);
+  white-space: nowrap;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.18);
+  pointer-events: none;
+  transform: translate(-50%, calc(-100% - 14px));
+}
+
+/* Near the right edge it hangs to the left of the pointer, so it never runs off the card. */
+.wm-tip.is-left {
+  transform: translate(calc(-100% + 18px), calc(-100% - 14px));
+}
+
+.wm-tip-name {
+  font-weight: 650;
+}
+
+.wm-tip-value {
+  opacity: 0.8;
+}
+
+/* "1 ▢▢▢▢▢ 120": what the shades mean. */
+.wm-legend {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface) 85%, transparent);
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.wm-legend span:first-child {
+  margin-right: 4px;
+}
+
+.wm-legend span:last-child {
+  margin-left: 4px;
+}
+
+.wm-swatch {
+  width: 16px;
+  height: 8px;
+  border-radius: 2px;
+}
+
+.wm-swatch.wm-s1 {
+  background: var(--wm-1);
+}
+.wm-swatch.wm-s2 {
+  background: var(--wm-2);
+}
+.wm-swatch.wm-s3 {
+  background: var(--wm-3);
+}
+.wm-swatch.wm-s4 {
+  background: var(--wm-4);
+}
+.wm-swatch.wm-s5 {
+  background: var(--wm-5);
+}
+
+/* Phones: the key goes under the map, where it doesn't cover any land. */
+@media (max-width: 640px) {
+  .wm-legend {
+    position: static;
+    width: max-content;
+    margin-top: 6px;
+    padding: 0;
+    background: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wm-placeholder {
+    animation: none;
+  }
+}

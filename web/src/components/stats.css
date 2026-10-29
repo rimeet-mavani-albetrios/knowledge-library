@@ -1,0 +1,696 @@
+/* The Stats page (StatsPage.jsx): number boxes, the world map card, bar charts and the week's changes.
+   Teal is the color of "where things come from" (the map and its list), the accent the color of your own links. */
+
+.stats-page {
+  --teal: #0f8a77;
+  --teal-soft: color-mix(in oklab, var(--teal) 13%, var(--surface));
+  --gold: #b07a00;
+  --gold-soft: color-mix(in oklab, var(--gold) 14%, var(--surface));
+  --success-soft: color-mix(in oklab, var(--success) 13%, var(--surface));
+  padding-top: 22px;
+  padding-bottom: 72px;
+}
+
+:root[data-theme='dark'] .stats-page {
+  --teal: #43c2aa;
+  --gold: #f2c14e;
+}
+
+/* ---------- Title ---------- */
+
+.stats-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 18px;
+  margin-bottom: 22px;
+}
+
+.stats-back {
+  flex: none;
+  margin-top: 4px;
+}
+
+.stats-head-text {
+  min-width: 0;
+}
+
+.stats-title {
+  font-family: var(--display);
+  font-size: clamp(26px, 2.6vw, 36px);
+  font-weight: 750;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
+}
+
+.stats-sub {
+  margin: 6px 0 0;
+  color: var(--text-2);
+  max-width: 640px;
+}
+
+/* ---------- Cards ---------- */
+
+.stats-card {
+  min-width: 0;
+  padding: 20px 22px 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgb(20 24 43 / 0.04);
+}
+
+.stats-card-head {
+  margin-bottom: 16px;
+}
+
+.stats-card-head h3 {
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.stats-card-head p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.stats-col {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.stats-where {
+  margin-bottom: 16px;
+}
+
+.stats-mini-title {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.stats-quiet {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.stats-more {
+  display: inline-block;
+  margin: 10px 8px 0;
+  font-size: 14px;
+}
+
+/* ---------- The four numbers ---------- */
+
+.stats-numbers {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stats-num {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'icon label'
+    'value value'
+    'sub sub';
+  align-items: center;
+  column-gap: 10px;
+  min-width: 0;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 1px 2px rgb(20 24 43 / 0.04);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+
+.stats-num.is-button {
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+@media (hover: hover) {
+  .stats-num.is-button:hover {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow);
+  }
+}
+
+.stats-num-icon {
+  grid-area: icon;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+}
+
+.stats-num-label {
+  grid-area: label;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.stats-num-value {
+  grid-area: value;
+  margin-top: 10px;
+  font-family: var(--display);
+  font-size: 38px;
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-num-sub {
+  grid-area: sub;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.stats-page .is-accent {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.stats-page .is-teal {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.stats-page .is-gold {
+  background: var(--gold-soft);
+  color: var(--gold);
+}
+
+.stats-page .is-danger {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.stats-page .is-success {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+/* ---------- Where your tools come from ---------- */
+
+.stats-where-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 28px;
+  align-items: start;
+}
+
+.stats-map {
+  position: relative;
+  min-width: 0;
+}
+
+/* No countries yet: a small card over the grey map says what will happen. */
+.stats-map-note {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: min(380px, 86%);
+  padding: 16px 20px;
+  transform: translate(-50%, -50%);
+  background: color-mix(in oklab, var(--surface) 90%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  text-align: center;
+  color: var(--text-2);
+  font-size: 14px;
+  backdrop-filter: blur(3px);
+}
+
+.stats-map-note svg {
+  color: var(--teal);
+}
+
+.stats-map-note strong {
+  color: var(--text);
+  font-size: 15.5px;
+}
+
+.stats-countries {
+  min-width: 0;
+}
+
+.stats-unknown {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 8px 4px;
+  border: 0;
+  border-top: 1px dashed var(--line-strong);
+  background: none;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .stats-unknown:hover {
+    color: var(--text);
+  }
+}
+
+/* ---------- Bars (countries and categories): name and number, the bar under them ---------- */
+
+.stats-bars {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-bar-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  row-gap: 6px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .stats-bar-row:hover {
+    background: var(--surface-2);
+  }
+}
+
+.stats-bar-name {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 550;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stats-flag {
+  font-size: 17px;
+  line-height: 1;
+}
+
+.stats-cat-icon {
+  flex: none;
+  color: var(--hue-ink);
+}
+
+.stats-bar-count {
+  padding-left: 12px;
+  color: var(--text-2);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-bar-track {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.stats-bar-row:hover .stats-bar-track {
+  background: var(--line);
+}
+
+.stats-bar-fill {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+}
+
+.stats-bar-fill.stats-fill-teal {
+  background: var(--teal);
+}
+
+.stats-bar-fill.stats-fill-hue {
+  background: var(--hue);
+}
+
+/* ---------- Saved per month: one column per month ---------- */
+
+.stats-months {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  height: 220px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-month {
+  display: grid;
+  grid-template-rows: 20px 1fr 20px 16px;
+  justify-items: center;
+  min-width: 0;
+}
+
+.stats-month-value {
+  align-self: end;
+  font-size: 12.5px;
+  font-weight: 650;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.stats-month-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.stats-month-bar span {
+  display: block;
+  width: min(70%, 36px);
+  border-radius: 6px 6px 0 0;
+  background: linear-gradient(to top, var(--accent), color-mix(in oklab, var(--accent) 65%, var(--surface)));
+}
+
+.stats-month-bar span.is-zero {
+  height: 0;
+}
+
+.stats-month-name {
+  align-self: end;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.stats-month-year {
+  font-size: 11px;
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.stats-foot-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+
+.stats-foot-note svg {
+  flex: none;
+  margin-top: 2px;
+  color: var(--muted);
+}
+
+/* ---------- Changes this week ---------- */
+
+.stats-change-list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-change {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .stats-change:hover {
+    background: var(--surface-2);
+  }
+}
+
+.stats-change-icon.row-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+}
+
+.stats-change-icon img {
+  width: 20px;
+  height: 20px;
+}
+
+.stats-change-text {
+  display: grid;
+  min-width: 0;
+}
+
+.stats-change-title,
+.stats-change-what {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.stats-change-title {
+  font-weight: 600;
+}
+
+.stats-change-what {
+  color: var(--text-2);
+  font-size: 13.5px;
+}
+
+.stats-change-side {
+  display: grid;
+  justify-items: end;
+  gap: 3px;
+}
+
+.stats-change-kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.stats-change-when {
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.stats-broken-title {
+  margin-top: 18px;
+}
+
+.stats-empty {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 22px 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.stats-empty svg {
+  margin-bottom: 2px;
+  color: var(--teal);
+}
+
+.stats-empty strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+/* ---------- Weekly email (stats/weekly-email.jsx) ---------- */
+
+.stats-email-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.stats-email-head > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.stats-email-status {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+
+.stats-email-status.is-on {
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.stats-email-week {
+  margin: 0 0 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.stats-email-week strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ---------- Loading ---------- */
+
+.stats-page .is-skeleton {
+  min-height: 132px;
+  background: var(--surface-2);
+  border-color: transparent;
+  box-shadow: none;
+  animation: stats-pulse 1.6s ease-in-out infinite;
+}
+
+.stats-card.is-skeleton {
+  min-height: 300px;
+}
+
+.stats-card.is-skeleton.stats-where {
+  min-height: 460px;
+}
+
+@keyframes stats-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ---------- Smaller screens ---------- */
+
+@media (max-width: 1180px) {
+  .stats-numbers {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .stats-where-body,
+  .stats-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .stats-page {
+    padding-top: 14px;
+  }
+
+  .stats-head {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .stats-back {
+    margin-top: 0;
+  }
+
+  .stats-numbers {
+    gap: 10px;
+  }
+
+  .stats-num {
+    padding: 12px 14px;
+  }
+
+  .stats-num-value {
+    font-size: 30px;
+  }
+
+  .stats-card {
+    padding: 16px;
+  }
+
+  .stats-months {
+    height: 180px;
+    gap: 3px;
+  }
+
+  .stats-month-value {
+    font-size: 11px;
+  }
+
+  .stats-month-name {
+    font-size: 11px;
+  }
+
+  /* The note over the map would cover it all on a phone: it goes under the map instead. */
+  .stats-map-note {
+    position: static;
+    width: auto;
+    margin-top: 10px;
+    transform: none;
+    box-shadow: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stats-page .is-skeleton {
+    animation: none;
+  }
+}

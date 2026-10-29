@@ -1,0 +1,20 @@
+/* The "Stats" button in the top bar (Header.jsx). While the Stats page is open it looks pressed. */
+
+.header-actions .btn.btn-stats[aria-pressed='true'] {
+  border-color: color-mix(in oklab, var(--accent) 45%, var(--line));
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+@media (max-width: 640px) {
+  /* Phones: just the chart icon. */
+  .header-actions .btn-stats {
+    width: 40px;
+    padding: 0;
+  }
+
+  /* With the small search box in the top bar there's no room for it: the search gets the space. */
+  .has-search .btn-stats {
+    display: none;
+  }
+}

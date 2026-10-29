@@ -1,7 +1,7 @@
 // One link as a card (preview picture, category, title, summary or why it matched your search, tags),
 // as a short row for the list view, or as a tile for the compact view (icon, name, website and a few small tags).
 import { memo, useLayoutEffect, useRef, useState } from 'react';
-import { ExternalLink, Star, Unlink, LoaderCircle, Clock, CircleAlert, Check, Columns3 } from 'lucide-react';
+import { ExternalLink, Star, Unlink, LoaderCircle, Clock, CircleAlert, Check, Columns3, TrendingUp } from 'lucide-react';
 import { CategoryBadge, categoryStyle, hueOf } from '../categories.jsx';
 import { GitHubIcon } from './Icons.jsx';
 import Highlight from './Highlight.jsx';
@@ -10,6 +10,7 @@ import { useInTray } from '../compare.js';
 import { useUpdateLink, useCountOpen } from '../hooks.js';
 import { compactNumber, fullDate, fullDateTime, hostOf, siteOf, PRICING_LABELS, STATUS_LABELS, MY_STATUS_LABELS, isWorking } from '../format.js';
 import './views.css';
+import './price-up.css';
 
 const REMEMBER_MAX = 2000; // more than the whole library, so no known-bad address is pushed out and tried again
 const REMEMBER_DAYS = 14; // then it gets another chance (the site may have fixed it)
@@ -268,11 +269,21 @@ function Added({ date, className = '' }) {
   );
 }
 
+// The price watch found a plan's price rose in the last 30 days: a tiny amber arrow next to the price.
+const priceWentUp = link => Boolean(link.priceUpAt) && Date.now() - new Date(link.priceUpAt) < 30 * DAY;
+const PriceUp = ({ link }) => (
+  <span className="price-up" title={`Price went up on ${fullDate(link.priceUpAt)}`}>
+    <TrendingUp size={12} strokeWidth={2.6} aria-hidden="true" />
+    <span className="sr-only">Price went up</span>
+  </span>
+);
+
 // One link as a short row, for the list view: about 8 fit on a laptop screen.
 export const LinkRow = memo(function LinkRow({ link, owner, onOpen, selectable = false, selected = false, onToggle }) {
   const { inCompare, popIn } = useInCompare(link, selectable);
   const working = isWorking(link);
   const pricing = PRICING_LABELS[link.pricing];
+  const up = !working && priceWentUp(link);
   const peek = usePeek(link, { owner, onOpen, selectable });
 
   return (
@@ -297,7 +308,12 @@ export const LinkRow = memo(function LinkRow({ link, owner, onOpen, selectable =
         )}
         <div className="row-meta">
           <CategoryBadge name={link.category} />
-          {pricing && !working && <span className="pill">{pricing}</span>}
+          {(pricing || up) && !working && (
+            <span className="pill">
+              {pricing}
+              {up && <PriceUp link={link} />}
+            </span>
+          )}
           {MY_STATUS_LABELS[link.myStatus] && <span className="pill pill-status">{MY_STATUS_LABELS[link.myStatus]}</span>}
           {link.health === 'broken' && (
             <span className="warn">
@@ -335,6 +351,7 @@ export const LinkRow = memo(function LinkRow({ link, owner, onOpen, selectable =
 // read the category and price aren't known yet, so a grey shape stands in for them.
 function TileTags({ link, working }) {
   const pricing = working ? null : PRICING_LABELS[link.pricing];
+  const up = !working && priceWentUp(link);
   const stars = working || !link.github ? null : compactNumber(link.github.stars);
   return (
     <div className="tile-tags">
@@ -344,7 +361,12 @@ function TileTags({ link, working }) {
         ) : (
           <span className="tile-tag tile-cat">{categoryStyle(link.category).short}</span>
         )}
-        {pricing ? <span className="tile-tag">{pricing}</span> : null}
+        {pricing || up ? (
+          <span className="tile-tag">
+            {pricing}
+            {up ? <PriceUp link={link} /> : null}
+          </span>
+        ) : null}
       </span>
       {stars || link.favorite ? (
         <span className="tile-tags-end">
@@ -397,6 +419,7 @@ function LinkCard({ link, owner, onOpen, selectable = false, selected = false, o
   const working = isWorking(link);
   const tags = link.tags.slice(0, 3);
   const pricing = PRICING_LABELS[link.pricing];
+  const up = !working && priceWentUp(link);
   const peek = usePeek(link, { owner, onOpen, selectable });
 
   return (
@@ -404,7 +427,12 @@ function LinkCard({ link, owner, onOpen, selectable = false, selected = false, o
       data-id={link.id} style={hueOf(link.category)} {...peek}>
       <CardButton link={link} onOpen={onOpen} selectable={selectable} selected={selected} onToggle={onToggle} />
       <Preview link={link} />
-      {pricing && !working && <span className="price-pill">{pricing}</span>}
+      {(pricing || up) && !working && (
+        <span className="price-pill">
+          {pricing}
+          {up && <PriceUp link={link} />}
+        </span>
+      )}
       {inCompare && (
         <span className={`in-compare-chip${popIn ? ' is-new' : ''}`}>
           <Columns3 size={13} strokeWidth={2.4} aria-hidden="true" />

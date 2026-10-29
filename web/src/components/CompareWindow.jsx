@@ -13,6 +13,7 @@ import Modal from './Modal.jsx';
 import CompareHead, { CompareMedia, PickThisOne } from './CompareHead.jsx';
 import CompareActions from './CompareActions.jsx';
 import CompareVerdict from './CompareVerdict.jsx';
+import { factsSection, useCompareFacts } from './CompareFacts.jsx';
 import { api } from '../api.js';
 import { CategoryBadge, hueOf } from '../categories.jsx';
 import { FavoriteButton, OpenButton, SiteIcon } from './LinkCard.jsx';
@@ -119,7 +120,8 @@ function StatusCell({ link }) {
 // Every row: `value` is what's compared ("same in every column?"), `render(link, ui)` what's shown (`ui` is
 // { open, onToggle } for rows that can open), `text` the words for the "Same for all" line, `mark` the winners'
 // badge, `short` a value that fits beside the link's name on a phone. A `span` row is one cell across all columns.
-function sectionsFor(links, owner) {
+// `facts` are the website facts of the links (CompareFacts.jsx), for the "Website facts" section at the end.
+function sectionsFor(links, owner, facts) {
   const count = links.length;
   const tagCounts = new Map();
   for (const link of links) for (const tag of new Set(link.tags ?? [])) tagCounts.set(tag, (tagCounts.get(tag) ?? 0) + 1);
@@ -320,17 +322,18 @@ function sectionsFor(links, owner) {
         },
       ],
     },
+    factsSection(links, facts, winners),
   ].filter(Boolean);
 }
 
 // Everything the table needs, worked out once per set of links: for each section the rows that differ (and the
 // owner's rows that are always there), the rows that are the same for all (one quiet line), each link's wins for
 // the quick verdict (the same marks as the table), and how many rows differ.
-function buildModel(links, owner) {
+function buildModel(links, owner, facts) {
   if (!links.length) return null;
   const wins = links.map(() => []);
   let differences = 0;
-  const sections = sectionsFor(links, owner).map(section => {
+  const sections = sectionsFor(links, owner, facts).map(section => {
     const rows = [];
     const same = [];
     for (const row of section.rows) {
@@ -552,7 +555,8 @@ export function CompareWindow({ ids, q, owner, instant = false, onClose, onOpenL
   const links = useMemo(() => shownIds.map(id => byId.get(id) ?? null), [byId, key]);
   // (No links at all, before the first comparison, is not "loaded": there's nothing to work out.)
   const loaded = links.length > 0 && links.every(Boolean);
-  const model = useMemo(() => (loaded ? buildModel(links, owner) : null), [links, loaded, owner]);
+  const facts = useCompareFacts(key);
+  const model = useMemo(() => (loaded ? buildModel(links, owner, facts) : null), [links, loaded, owner, facts]);
   const visible = useMemo(
     () =>
       (model?.sections ?? [])

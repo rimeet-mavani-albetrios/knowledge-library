@@ -1,10 +1,12 @@
-// The "Filters" button and its panel: where links come from, "show only" (free, favorites, broken links),
-// your status, level, collection and tags, each in its own named section with counts.
+// The "Filters" button and its panel: where links come from, "show only" (free, favorites, broken links, trust
+// grade A–B), your status, level, collection, the company's country and tags, each in its own named section with
+// counts. The trust grade and country come from the facts the robot finds about each website, so those choices only
+// show once some links have them.
 // Chosen filters show as chips with an × in a thin row under the toolbar (so they stay in view while you
 // scroll), and the button grows an × of its own that clears them all. The owner can rename a tag there too.
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { X, Star, Pencil, SlidersHorizontal, Unlink, Search, Folder, BadgeDollarSign } from 'lucide-react';
+import { X, Star, Pencil, SlidersHorizontal, Unlink, Search, Folder, BadgeDollarSign, ShieldCheck } from 'lucide-react';
 import { api } from '../api.js';
 import { facetsQuery } from '../useLinks.js';
 import { LEVEL_LABELS, MY_STATUS_LABELS } from '../format.js';
@@ -12,6 +14,7 @@ import { PHONE } from '../hooks.js';
 import { GitHubIcon } from './Icons.jsx';
 import { useToast } from './Toasts.jsx';
 import { Popover } from './Popover.jsx';
+import { countryFlag, countryName } from './country-names.js';
 
 const SOURCES = [
   ['', 'All'],
@@ -91,8 +94,15 @@ function ActiveChip({ label, onRemove }) {
 }
 
 const COLLECTIONS_SHOWN = 8; // the Collection section shows this many before "Show all"
-const EMPTY = { categories: [], sources: [], collections: [], levels: [], statuses: [], tags: [], free: 0, favorites: 0, broken: 0, total: 0 };
-const CLEAR_ALL = { source: '', free: false, favorite: false, level: '', status: '', collection: '', tag: '', broken: false };
+const COUNTRIES_SHOWN = 8; // and so does the Company country section
+const UNKNOWN_COUNTRY = 'unknown'; // the country filter for links whose country isn't known yet (from the Stats page)
+const EMPTY = {
+  categories: [], sources: [], collections: [], levels: [], statuses: [], tags: [], countries: [],
+  free: 0, favorites: 0, broken: 0, trusted: 0, total: 0,
+};
+const CLEAR_ALL = { source: '', free: false, favorite: false, level: '', status: '', collection: '', tag: '', broken: false, country: '', trust: false };
+
+const countryLabel = code => (code === UNKNOWN_COUNTRY ? 'Country not known yet' : `${countryFlag(code)} ${countryName(code)}`.trim());
 
 // How many links each filter option has, for the current search and filters. Shared by the toolbar and the panel.
 export function useFacets(params) {
@@ -102,12 +112,14 @@ export function useFacets(params) {
 
 // The filters that are on, except the category (the toolbar shows that one): [{ key, label, clear }].
 function activeFilters(params) {
-  const { source, collection, level, status, favorite, free, broken } = params;
+  const { source, collection, level, status, favorite, free, broken, country, trust } = params;
   return [
     source && { key: 'source', label: SOURCES.find(([value]) => value === source)?.[1] ?? source, clear: { source: '' } },
     free && { key: 'free', label: 'Free', clear: { free: false } },
     favorite && { key: 'favorite', label: 'Favorites', clear: { favorite: false } },
     broken && { key: 'broken', label: 'Broken links', clear: { broken: false } },
+    trust && { key: 'trust', label: 'Trust A–B', clear: { trust: false } },
+    country && { key: 'country', label: countryLabel(country), clear: { country: '' } },
     status && { key: 'status', label: MY_STATUS_LABELS[status] ?? status, clear: { status: '' } },
     level && { key: 'level', label: LEVEL_LABELS[level] ?? level, clear: { level: '' } },
     collection && { key: 'collection', label: collection, clear: { collection: '' } },
@@ -155,14 +167,16 @@ function Choice({ on, onClick, children }) {
 }
 
 function FiltersPanel({ params, setParams, data, onDone }) {
-  const { source, collection, tag, level, status, favorite, free, broken } = params;
+  const { source, collection, tag, level, status, favorite, free, broken, country, trust } = params;
   const [find, setFind] = useState('');
   const [allCollections, setAllCollections] = useState(false);
+  const [allCountries, setAllCountries] = useState(false);
   const count = (list, value) => list.find(item => item.value === value)?.count ?? 0;
   // The biggest collections first; the rest wait behind "Show all", plus the chosen one, so it can be turned off.
   const collections = allCollections
     ? data.collections
     : data.collections.filter((item, i) => i < COLLECTIONS_SHOWN || item.value === collection);
+  const countries = allCountries ? data.countries : data.countries.filter((item, i) => i < COUNTRIES_SHOWN || item.value === country);
   const sources = SOURCES.filter(([value]) => !value || count(data.sources, value) || source === value);
   const needle = find.trim().toLowerCase();
   const tags = data.tags.filter(item => !needle || item.value.toLowerCase().includes(needle)).slice(0, needle ? 40 : 18);
@@ -170,6 +184,7 @@ function FiltersPanel({ params, setParams, data, onDone }) {
     (data.free > 0 || free) && { key: 'free', on: free, label: 'Free', Icon: BadgeDollarSign, n: data.free },
     (data.favorites > 0 || favorite) && { key: 'favorite', on: favorite, label: 'Favorites', Icon: Star, n: data.favorites },
     (data.broken > 0 || broken) && { key: 'broken', on: broken, label: 'Broken links', Icon: Unlink, n: data.broken },
+    (data.trusted > 0 || trust) && { key: 'trust', on: trust, label: 'Trust A–B', Icon: ShieldCheck, n: data.trusted },
   ].filter(Boolean);
 
   return (
@@ -233,6 +248,29 @@ function FiltersPanel({ params, setParams, data, onDone }) {
             {data.collections.length > COLLECTIONS_SHOWN ? (
               <button type="button" className="link-btn fp-more" aria-expanded={allCollections} onClick={() => setAllCollections(!allCollections)}>
                 {allCollections ? 'Show fewer' : `Show all ${data.collections.length}`}
+              </button>
+            ) : null}
+          </Section>
+        )}
+
+        {(data.countries.length > 0 || country) && (
+          <Section title="Company country">
+            {countries.map(({ value, count: n }) => (
+              <Choice key={value} on={country === value} onClick={() => setParams({ country: country === value ? '' : value })}>
+                <span className="fp-flag" aria-hidden="true">
+                  {countryFlag(value)}
+                </span>
+                {countryName(value)} <span className="chip-count">{n}</span>
+              </Choice>
+            ))}
+            {country && !count(data.countries, country) && (
+              <Choice on onClick={() => setParams({ country: '' })}>
+                {countryLabel(country)}
+              </Choice>
+            )}
+            {data.countries.length > COUNTRIES_SHOWN ? (
+              <button type="button" className="link-btn fp-more" aria-expanded={allCountries} onClick={() => setAllCountries(!allCountries)}>
+                {allCountries ? 'Show fewer' : `Show all ${data.countries.length}`}
               </button>
             ) : null}
           </Section>

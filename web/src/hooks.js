@@ -9,10 +9,12 @@ import { isWorking } from './format.js';
 const DEFAULTS = {
   q: '', exact: false, category: '', source: '', collection: '', tag: '', level: '', status: '', favorite: false, free: false,
   broken: false, sort: 'newest', link: '', compare: '',
+  // From the facts about each website: the company's country ("US") and "trust grade A or B". `stats` is the Stats page.
+  country: '', trust: false, stats: false,
 };
-const YES_NO = new Set(['exact', 'favorite', 'free', 'broken']);
+const YES_NO = new Set(['exact', 'favorite', 'free', 'broken', 'trust', 'stats']);
 // The choices that stay with you when Back leaves a search (see useUrlState).
-const KEPT_ON_BACK = ['category', 'source', 'collection', 'tag', 'level', 'status', 'favorite', 'free', 'broken', 'sort'];
+const KEPT_ON_BACK = ['category', 'source', 'collection', 'tag', 'level', 'status', 'favorite', 'free', 'broken', 'sort', 'country', 'trust'];
 
 function readUrl() {
   const search = new URLSearchParams(window.location.search);

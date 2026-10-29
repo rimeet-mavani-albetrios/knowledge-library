@@ -34,3 +34,16 @@ services:
         sync: false
       - key: GITHUB_TOKEN # optional: a free GitHub token for star counts
         sync: false
+      # Optional website facts (Popularity tab and safety check):
+      - key: CLOUDFLARE_API_TOKEN # free Cloudflare token with Account → Radar → Read, for "Popular in"
+        sync: false
+      - key: GOOGLE_API_KEY # free Google key for YouTube Data API v3 + Safe Browsing API
+        sync: false
+      # The daily wake-up (.github/workflows/daily.yml): the same long random text as the CRON_SECRET secret on GitHub.
+      - key: CRON_SECRET
+        sync: false
+      # Optional: the weekly email (see the README). A free key from resend.com, and the email you signed up with.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: WEEKLY_EMAIL_TO
+        sync: false

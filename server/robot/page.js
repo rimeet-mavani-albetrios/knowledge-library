@@ -3,7 +3,7 @@ import dns from 'node:dns/promises';
 import net from 'node:net';
 import * as cheerio from 'cheerio';
 
-const USER_AGENT =
+export const USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36 KnowledgeLibraryRobot/2.0';
 const MAX_HTML = 2_000_000;
 const MAX_TEXT = 12000;
@@ -24,7 +24,7 @@ function isPrivateAddress(ip) {
   return lower === '::1' || lower === '::' || /^f[cd]/.test(lower) || /^fe[89ab]/.test(lower);
 }
 
-async function assertPublic(url) {
+export async function assertPublic(url) {
   const { hostname, protocol } = new URL(url);
   if (!/^https?:$/.test(protocol)) throw Object.assign(new Error('Only http and https links can be read'), { code: 'BLOCKED' });
   const host = hostname.replace(/^\[|\]$/g, '');
@@ -33,7 +33,7 @@ async function assertPublic(url) {
 }
 
 // fetch() that checks every redirect hop too.
-async function safeFetch(url, { timeout = 20_000, ...options } = {}) {
+export async function safeFetch(url, { timeout = 20_000, ...options } = {}) {
   for (let hop = 0; hop < 6; hop++) {
     await assertPublic(url);
     const res = await fetch(url, { ...options, redirect: 'manual', signal: AbortSignal.timeout(timeout) });

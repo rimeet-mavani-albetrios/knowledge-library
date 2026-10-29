@@ -1,8 +1,10 @@
 // Top bar: library name, theme switch, the owner's buttons, and a small search box once you scroll down.
 import { useEffect, useRef, useState } from 'react';
-import { Plus, Sun, Moon, Monitor, LogIn, LogOut, Download, Ellipsis, BookmarkPlus } from 'lucide-react';
+import { Plus, Sun, Moon, Monitor, LogIn, LogOut, Download, Ellipsis, BookmarkPlus, ChartColumn } from 'lucide-react';
 import { LogoMark } from './Icons.jsx';
+import EmailMenu from './EmailMenu.jsx';
 import { useTheme } from '../hooks.js';
+import './header-stats.css';
 
 const THEMES = [
   ['light', Sun, 'Light theme'],
@@ -80,6 +82,7 @@ function OwnerMenu({ canLogOut, onLogout, onSaveButton }) {
           <a role="menuitem" href="/api/export?format=html" onClick={() => setOpen(false)}>
             <Download size={16} aria-hidden="true" /> Browser bookmarks (HTML)
           </a>
+          <EmailMenu onClose={() => setOpen(false)} />
           {canLogOut && (
             <button
               type="button"
@@ -98,8 +101,28 @@ function OwnerMenu({ canLogOut, onLogout, onSaveButton }) {
   );
 }
 
+// "Stats" opens the Stats page (and, while it's open, goes back to the library). Everyone can see it, like the links.
+// Resting the mouse on it gets the page ready, so the click shows it at once.
+function StatsButton({ open, onClick, onReady }) {
+  return (
+    <button
+      type="button"
+      className="btn btn-ghost btn-stats"
+      aria-label="Stats"
+      aria-pressed={open}
+      title={open ? 'Back to your library' : 'Your library in numbers: where your tools come from, what changed'}
+      onClick={onClick}
+      onPointerEnter={onReady}
+      onFocus={onReady}
+    >
+      <ChartColumn size={17} aria-hidden="true" />
+      <span className="hide-small">Stats</span>
+    </button>
+  );
+}
+
 // `search` is the small search box, shown once the big one has scrolled out of sight.
-export default function Header({ me, search, onAdd, onLogin, onLogout, onSaveButton }) {
+export default function Header({ me, search, onAdd, onLogin, onLogout, onSaveButton, statsOpen, onStats, onStatsReady }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -123,6 +146,7 @@ export default function Header({ me, search, onAdd, onLogin, onLogout, onSaveBut
           {me?.owner ? (
             <>
               <OwnerMenu canLogOut={me.mode === 'password'} onLogout={onLogout} onSaveButton={onSaveButton} />
+              <StatsButton open={statsOpen} onClick={onStats} onReady={onStatsReady} />
               <button type="button" className="btn btn-primary btn-add" aria-label="Add links" onClick={onAdd}>
                 <Plus size={18} aria-hidden="true" />
                 <span className="hide-small">Add links</span>
@@ -130,11 +154,14 @@ export default function Header({ me, search, onAdd, onLogin, onLogout, onSaveBut
               </button>
             </>
           ) : (
-            me?.mode === 'password' && (
-              <button type="button" className="btn btn-ghost" onClick={onLogin}>
-                <LogIn size={17} aria-hidden="true" /> Log in
-              </button>
-            )
+            <>
+              {me ? <StatsButton open={statsOpen} onClick={onStats} onReady={onStatsReady} /> : null}
+              {me?.mode === 'password' && (
+                <button type="button" className="btn btn-ghost" onClick={onLogin}>
+                  <LogIn size={17} aria-hidden="true" /> Log in
+                </button>
+              )}
+            </>
           )}
         </div>
       </div>

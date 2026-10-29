@@ -1,0 +1,55 @@
+/* The compare window's "Website facts" rows (CompareFacts.jsx): the app rating's star and the trust grade badge. */
+
+.cf-rating {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 650;
+}
+
+.cf-rating svg {
+  color: var(--warning);
+  fill: currentColor;
+}
+
+.cf-rising {
+  color: var(--success);
+  font-weight: 600;
+}
+
+/* A–F like a school grade: green for A, through yellow, to red for F. */
+.cf-grade {
+  --grade: #1c7c54;
+  display: inline-grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: 7px;
+  background: color-mix(in oklab, var(--grade) 16%, var(--surface));
+  color: color-mix(in oklab, var(--grade) 75%, var(--text));
+  font-family: var(--display);
+  font-weight: 750;
+  font-size: 15px;
+}
+
+.cf-grade.is-b {
+  --grade: #3f9d3a;
+}
+
+.cf-grade.is-c {
+  --grade: #b8860b;
+}
+
+.cf-grade.is-d {
+  --grade: #d9480f;
+}
+
+.cf-grade.is-e,
+.cf-grade.is-f {
+  --grade: #c4372f;
+}
+
+.cf-grade + .compare-sub {
+  margin-top: 3px;
+}

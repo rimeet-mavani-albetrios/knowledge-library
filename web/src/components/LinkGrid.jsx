@@ -9,6 +9,7 @@ import LinkCard, { LinkRow, LinkTile } from './LinkCard.jsx';
 import { PeekLayer } from './Peek.jsx';
 import BulkBar from './BulkBar.jsx';
 import { detailQuery } from './LinkDrawer.jsx';
+import { factsQuery } from './facts/FactsTabs.jsx';
 
 function SkeletonCard() {
   return (
@@ -120,7 +121,12 @@ function LinkGrid({ params, setParams, owner, onOpen, onAdd, view, selecting, on
     const id = event.target.closest?.('[data-id]')?.dataset.id ?? null;
     if (id === ahead.current.id) return;
     clearTimeout(ahead.current.timer);
-    ahead.current = { id, timer: id ? setTimeout(() => queryClient.prefetchQuery(detailQuery(id, q)), LOAD_AHEAD_WAIT) : 0 };
+    // The details and the website facts (the window's tabs), so both are there when you click.
+    const load = () => {
+      queryClient.prefetchQuery(detailQuery(id, q));
+      queryClient.prefetchQuery(factsQuery(id));
+    };
+    ahead.current = { id, timer: id ? setTimeout(load, LOAD_AHEAD_WAIT) : 0 };
   };
   const filtersKey = JSON.stringify(linkFilters(params));
   useEffect(() => setSelected(new Set()), [filtersKey, selecting]);
@@ -168,7 +174,7 @@ function LinkGrid({ params, setParams, owner, onOpen, onAdd, view, selecting, on
   const pages = query.data?.pages ?? [];
   const links = pages.flatMap(page => page.items);
   const first = stale ? undefined : pages[0];
-  const filtered = category || source || collection || tag || level || status || favorite || free || broken;
+  const filtered = category || source || collection || tag || level || status || favorite || free || broken || params.country || params.trust;
   const searched = first?.corrected ?? q;
   const grouped = q && first && !first.closestOnly;
 
@@ -244,7 +250,10 @@ function LinkGrid({ params, setParams, owner, onOpen, onAdd, view, selecting, on
                 type="button"
                 className="btn btn-ghost"
                 onClick={() =>
-                  setParams({ q: '', category: '', source: '', collection: '', tag: '', level: '', status: '', favorite: false, free: false, broken: false })
+                  setParams({
+                    q: '', category: '', source: '', collection: '', tag: '', level: '', status: '', favorite: false, free: false, broken: false,
+                    country: '', trust: false,
+                  })
                 }
               >
                 Clear search and filters

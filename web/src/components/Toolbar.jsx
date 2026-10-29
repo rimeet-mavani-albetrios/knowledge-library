@@ -8,7 +8,7 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowDownAZ, ArrowUpDown, Check, ChevronDown, Clock, Columns3, Flame, Globe, Grid3x3, History, Hourglass,
-  LayoutGrid, List, ListChecks, MapIcon, Search, Star, X,
+  LayoutGrid, List, ListChecks, MapIcon, Search, Star, ThumbsUp, TrendingUp, X,
 } from 'lucide-react';
 import { categoryStyle, hueOf } from '../categories.jsx';
 import { PHONE, useMediaQuery, VIEWS } from '../hooks.js';
@@ -26,6 +26,7 @@ const HOVER_WAIT = 120;
 // No search and no filters: the whole library, for the tabs' fixed order.
 const NOTHING_CHOSEN = {
   q: '', exact: false, category: '', source: '', collection: '', tag: '', level: '', status: '', favorite: false, free: false, broken: false,
+  country: '', trust: false,
 };
 
 // Phones slide the tabs sideways with a finger, so they get this many of the biggest categories (and "more").
@@ -43,6 +44,9 @@ const SORTS = [
   { value: 'oldest', label: 'Oldest first', short: 'Oldest', Icon: Hourglass },
   { value: 'title', label: 'A to Z', short: 'A to Z', Icon: ArrowDownAZ },
   { value: 'stars', label: 'Most GitHub stars', short: 'Stars', Icon: GitHubIcon },
+  // From the facts about each website: its popularity bucket and its app's rating. Links without them go last.
+  { value: 'popular', label: 'Most popular', short: 'Popular', Icon: TrendingUp },
+  { value: 'rated', label: 'Best rated', short: 'Best rated', Icon: ThumbsUp },
 ];
 
 // The three ways to show the links. The order is also the order the phone's one button cycles through.

@@ -87,3 +87,23 @@ CREATE TABLE IF NOT EXISTS meta (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+
+-- Website facts (version 5): small facts about each website, collected a few at a time by server/facts/runner.js.
+-- `facts` has one key per kind ("company", "age", "trust"…); a kind set to null was checked and nothing was found.
+CREATE TABLE IF NOT EXISTS link_facts (
+  link_id    TEXT PRIMARY KEY REFERENCES links(id) ON DELETE CASCADE,
+  facts      JSONB NOT NULL DEFAULT '{}',  -- one key per kind
+  checked    JSONB NOT NULL DEFAULT '{}',  -- { kind: ISO time it was last checked }
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Changes over time: GitHub stars each week, a price that went up, a new feature, a page that broke…
+CREATE TABLE IF NOT EXISTS link_history (
+  id       BIGSERIAL PRIMARY KEY,
+  link_id  TEXT NOT NULL REFERENCES links(id) ON DELETE CASCADE,
+  kind     TEXT NOT NULL,              -- stars | price | feature | dead | rising
+  data     JSONB NOT NULL,
+  found_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS link_history_link_idx ON link_history (link_id, kind, found_at DESC);
+CREATE INDEX IF NOT EXISTS link_history_found_idx ON link_history (found_at DESC);
