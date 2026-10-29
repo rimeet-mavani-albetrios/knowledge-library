@@ -6,7 +6,7 @@ import * as links from './links.js';
 import { kick, choresIfDue, refreshFingerprint } from './worker.js';
 import { embedQuery, toSqlVector } from './robot/embed.js';
 import { findUrls } from './robot/url.js';
-import { aiState } from './robot/ai.js';
+import { aiState, pickWithAi, AiPaused } from './robot/ai.js';
 import { exportLinks } from './export.js';
 import { libraryMap } from './map.js';
 import { fixSpelling } from './words.js';
@@ -127,6 +127,42 @@ api.get('/links/:id', requireReader, async (req, res) => {
   const link = await links.getLink(req.params.id, q);
   if (!link) return res.status(404).json({ error: 'This link is not in the library any more.' });
   res.json({ link, similar: await links.similarLinks(link.id) });
+});
+
+// ---------- Compare: 2 to 4 links side by side ----------
+
+const MAX_COMPARE = 4;
+const compareIds = value =>
+  [...new Set((Array.isArray(value) ? value : String(value ?? '').split(',')).filter(id => typeof id === 'string' && id))].slice(
+    0,
+    MAX_COMPARE,
+  );
+
+// The links in the order you picked them. A link deleted in the meantime is left out.
+async function linksInOrder(ids) {
+  const found = new Map((ids.length ? await links.getLinks(ids) : []).map(link => [link.id, link]));
+  return ids.map(id => found.get(id)).filter(Boolean);
+}
+
+api.get('/compare', requireReader, async (req, res) => {
+  res.json({ items: await linksInOrder(compareIds(req.query.ids)) });
+});
+
+// "Which should I pick?" Only the owner can ask: each question uses some of the free AI's daily limit.
+api.post('/compare/pick', requireOwner, async (req, res) => {
+  const picked = await linksInOrder(compareIds(req.body?.ids));
+  if (picked.length < 2) return res.status(400).json({ error: 'Pick 2 to 4 links to compare.' });
+  try {
+    res.json(await pickWithAi(picked));
+  } catch (err) {
+    if (!(err instanceof AiPaused)) throw err;
+    const minutes = Math.max(1, Math.ceil((err.until - Date.now()) / 60_000));
+    res.status(503).json({
+      error: Number.isFinite(err.until)
+        ? `The free AI is resting for about ${minutes} ${minutes === 1 ? 'minute' : 'minutes'}. Try again then.`
+        : 'The free AI is not set up yet (no Groq key).',
+    });
+  }
 });
 
 api.get('/export', requireOwner, async (req, res) => {

@@ -6,7 +6,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   X, ExternalLink, Copy, Pencil, Trash2, Star, Check, Unlink, LoaderCircle, Folder, CircleAlert, ArrowRight, Search, FileText,
-  ChevronLeft, ChevronRight, ChevronDown, Globe,
+  ChevronLeft, ChevronRight, ChevronDown, Globe, Columns3,
 } from 'lucide-react';
 import { api, toQuery } from '../api.js';
 import { CategoryBadge, categoryStyle, hueOf } from '../categories.jsx';
@@ -16,6 +16,7 @@ import Highlight from './Highlight.jsx';
 import { useToast } from './Toasts.jsx';
 import { useConfirm } from './Confirm.jsx';
 import { patchLinks, useUpdateLink, useCountOpen } from '../hooks.js';
+import { MAX_COMPARE, togglePick, useComparePicks } from '../compare.js';
 import {
   compactNumber, fullDate, hostOf, timeAgo, PRICING_LABELS, STATUS_LABELS, LEVEL_LABELS, MY_STATUS_LABELS, isWorking,
 } from '../format.js';
@@ -26,7 +27,7 @@ const SHOWN_HEADINGS = 10;
 const DISCARD = { title: 'Throw away your changes?', message: 'What you typed in the form will be lost.', confirmLabel: 'Throw away', danger: true };
 
 // The same key and request everywhere, so a link loaded ahead is found again when you reach it.
-const detailQuery = (id, q) => ({ queryKey: ['link', id, q], queryFn: () => api(`/links/${id}?${toQuery({ q })}`) });
+export const detailQuery = (id, q) => ({ queryKey: ['link', id, q], queryFn: () => api(`/links/${id}?${toQuery({ q })}`) });
 
 const exactTime = date => new Intl.DateTimeFormat('en', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(date));
 const times = n => `${n} ${n === 1 ? 'time' : 'times'}`;
@@ -64,12 +65,53 @@ function MyStatus({ link, owner }) {
   );
 }
 
-function Section({ title, children }) {
+// `action` is a small button at the right of the section's title ("Compare all").
+function Section({ title, action, children }) {
   return (
     <section className="detail-section">
-      <h3>{title}</h3>
+      {action ? (
+        <div className="detail-section-head">
+          <h3>{title}</h3>
+          {action}
+        </div>
+      ) : (
+        <h3>{title}</h3>
+      )}
       {children}
     </section>
+  );
+}
+
+// Puts this link in the compare tray, or takes it out. Once 4 links are picked, a fifth can't be added.
+// After adding, a message offers "Compare now" when there are 2 or more.
+function CompareToggle({ link, onCompare }) {
+  const picks = useComparePicks();
+  const toast = useToast();
+  const inCompare = picks.some(pick => pick.id === link.id);
+  const full = !inCompare && picks.length >= MAX_COMPARE;
+  return (
+    <button
+      type="button"
+      className={`btn btn-ghost detail-compare${inCompare ? ' is-on' : ''}${full ? ' is-full' : ''}`}
+      aria-pressed={inCompare}
+      aria-disabled={full || undefined}
+      title={full ? 'You can compare up to 4 links' : inCompare ? 'Take it out of compare' : 'Add to compare'}
+      onClick={() => {
+        if (full) return;
+        togglePick(link);
+        if (inCompare) return;
+        const ids = [...picks.map(pick => pick.id), link.id];
+        toast({
+          title: 'Added to compare',
+          description: `${ids.length} of ${MAX_COMPARE} picked`,
+          tone: 'info',
+          action: ids.length >= 2 ? { label: 'Compare now', onClick: () => onCompare(ids) } : undefined,
+        });
+      }}
+    >
+      {inCompare ? <Check size={17} aria-hidden="true" /> : <Columns3 size={17} aria-hidden="true" />}
+      {inCompare ? 'In compare' : 'Compare'}
+    </button>
   );
 }
 
@@ -86,6 +128,21 @@ function ShortList({ items, shown, className, render }) {
       )}
     </>
   );
+}
+
+// The link as the list (or the compare window) already has it, so a fresh open shows the name, picture, summary and
+// the rest at once; only "Similar" and the extra details wait for the server. `similar: null` marks it.
+function knownLink(queryClient, id) {
+  if (!id) return undefined;
+  for (const key of ['links', 'compare', 'link']) {
+    for (const [, data] of queryClient.getQueriesData({ queryKey: [key] })) {
+      // A list's pages, the compare window's links, or another details window's similar links.
+      const items = data?.pages ? data.pages.flatMap(page => page.items) : (data?.items ?? data?.similar ?? []);
+      const link = items.find(item => item.id === id);
+      if (link) return { link, similar: null };
+    }
+  }
+  return undefined;
 }
 
 // Grey shapes in the window's layout, only for the very first open when there is nothing to show yet.
@@ -234,7 +291,8 @@ function EditForm({ link, categories, onDone, onDirty }) {
 
 // `ids` are the results on screen, in order, so the arrows can go to the one before or after.
 // `onNearEnd` loads more results when you reach the last ones.
-export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose, onOpen, onTag, onNearEnd }) {
+// `instant`: the window swaps in without its fade (coming straight from the compare window).
+export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose, onOpen, onTag, onNearEnd, onCompare, instant = false }) {
   const ref = useRef(null);
   const bodyRef = useRef(null);
   const mainRef = useRef(null);
@@ -258,15 +316,17 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   const hasNav = position >= 0 && ids.length > 1;
 
   // With a search, the server also says where its words appear on the website.
-  // Moving to another link keeps the one on screen until the new one arrives; opening fresh shows the skeleton.
+  // Moving to another link keeps the one on screen until the new one arrives. A fresh open shows what the list
+  // already knows about the link at once, and the skeleton only when the link isn't in it.
   const detail = useQuery({
     ...detailQuery(id, q),
     enabled: Boolean(id),
-    placeholderData: old => (shown.current ? old : undefined),
+    placeholderData: old => (shown.current ? old : knownLink(queryClient, id)),
   });
   const link = detail.data?.link;
+  const similarLoading = detail.data?.similar === null; // shown from the list; the similar links are on their way
   const similar = detail.data?.similar ?? [];
-  const switching = detail.isPlaceholderData;
+  const switching = detail.isPlaceholderData && !similarLoading;
   useEffect(() => {
     shown.current = Boolean(id && link);
   });
@@ -275,10 +335,14 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
     if (position >= 0 && position >= ids.length - 3) onNearEnd?.();
   }, [position, ids.length, onNearEnd]);
 
-  useEffect(() => {
+  // The window opens and closes before the screen is drawn, so going straight to or from the compare window
+  // happens in one frame.
+  useLayoutEffect(() => {
     const dialog = ref.current;
     if (id && !dialog.open) dialog.showModal();
     if (!id && dialog.open) dialog.close();
+  }, [id]);
+  useEffect(() => {
     setEditing(false);
     setCopied(false);
     // Opening a link counts as using it, so the ones you use most come up first in search.
@@ -404,7 +468,7 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   return (
     <dialog
       ref={ref}
-      className="detail"
+      className={`detail${instant ? ' is-instant' : ''}`}
       aria-label={link ? link.title : 'Link details'}
       onClose={onClose}
       onCancel={event => {
@@ -416,7 +480,9 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
       }}
       onClick={event => event.target === ref.current && close()}
     >
-      {id && (
+      {/* `id ? … : null`, not `id && …`: an empty id would become an empty text child, and React then clears the
+          whole window with textContent, messages placed in it included (see Toasts.jsx). */}
+      {id ? (
         <>
           <div className="detail-window" aria-busy={switching || undefined}>
             {switching && <div className="detail-progress" aria-hidden="true" />}
@@ -490,6 +556,7 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
                             {copied ? <Check size={18} /> : <Copy size={18} />}
                           </button>
                           <FavoriteButton link={link} owner={owner} className="icon-btn" />
+                          <CompareToggle link={link} onCompare={compareIds => leave(() => onCompare(compareIds))} />
                           {owner && (
                             <>
                               <button type="button" className="icon-btn" title="Edit" aria-label="Edit" onClick={() => setEditing(true)}>
@@ -604,7 +671,21 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
               <aside className="detail-side" ref={sideRef} aria-label="Related">
                 {link ? (
                   <>
-                    <Section title="Similar in your library">
+                    <Section
+                      title="Similar in your library"
+                      action={
+                        similar.length > 0 && (
+                          <button
+                            type="button"
+                            className="detail-compare-all"
+                            onClick={() => leave(() => onCompare([link.id, ...similar.slice(0, MAX_COMPARE - 1).map(other => other.id)]))}
+                            title="See this link and the similar ones side by side"
+                          >
+                            <Columns3 size={14} aria-hidden="true" /> Compare all
+                          </button>
+                        )
+                      }
+                    >
                       {similar.length > 0 ? (
                         <ul className="detail-similar">
                           {similar.map(other => (
@@ -617,9 +698,21 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
                                 </span>
                                 <ChevronRight size={16} aria-hidden="true" className="detail-similar-go" />
                               </button>
+                              {/* A sibling of the row (not inside it): a button can't hold another button. */}
+                              <button
+                                type="button"
+                                className="detail-similar-compare"
+                                onClick={() => leave(() => onCompare([link.id, other.id]))}
+                                aria-label={`Compare ${link.title} with ${other.title}`}
+                                title={`Compare with ${other.title}`}
+                              >
+                                <Columns3 size={15} aria-hidden="true" />
+                              </button>
                             </li>
                           ))}
                         </ul>
+                      ) : similarLoading ? (
+                        <Skeleton side />
                       ) : (
                         <p className="detail-empty">Nothing similar saved yet.</p>
                       )}
@@ -747,7 +840,7 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
             </>
           )}
         </>
-      )}
+      ) : null}
     </dialog>
   );
 }

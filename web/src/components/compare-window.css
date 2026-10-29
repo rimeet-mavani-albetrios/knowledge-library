@@ -1,0 +1,792 @@
+/* The compare window (CompareWindow.jsx): the tools row, the AI's answer, and the table with one column per link,
+   its names on top and the row names at the left, both staying in view while you scroll. Phones get rows of
+   links instead of columns (bottom of this file). The quick verdict on top is compare-verdict.css; the column
+   heads (the strip of names, and the pictures and buttons under it) are compare-head.css. */
+
+/* ---------- The window ---------- */
+
+.modal.compare-dialog {
+  width: min(1280px, calc(100vw - 48px));
+  overflow: hidden;
+}
+
+.compare-dialog .modal-inner {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 48px);
+}
+
+.compare-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  margin-bottom: 12px;
+}
+
+.compare-diff {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.compare-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.compare-switch-track {
+  position: relative;
+  flex: none;
+  width: 36px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--line-strong);
+  transition: background-color 0.15s;
+}
+
+.compare-switch-track span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.25);
+  transition: transform 0.15s;
+}
+
+.compare-switch[aria-checked='true'] {
+  color: var(--text);
+}
+
+.compare-switch[aria-checked='true'] .compare-switch-track {
+  background: var(--accent);
+}
+
+.compare-switch[aria-checked='true'] .compare-switch-track span {
+  transform: translateX(16px);
+}
+
+.compare-switch:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* "6 differences", next to the switch */
+.compare-diff-count {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.compare-ask {
+  gap: 7px;
+  height: 36px;
+}
+
+/* The AI's answer */
+.compare-answer {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid color-mix(in oklab, var(--warning) 35%, var(--line));
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--warning) 7%, var(--surface));
+}
+
+.compare-answer-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: color-mix(in oklab, var(--warning) 20%, var(--surface));
+  color: var(--warning);
+}
+
+.compare-answer p {
+  margin: 0 0 4px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.compare-answer .compare-answer-pick {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.compare-answer ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.compare-answer strong {
+  color: var(--text);
+}
+
+.compare-answer .compare-answer-note {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------- The table ---------- */
+
+/* One column per link; the names stay at the top and the row names at the left while you scroll. The quick
+   verdict above the table uses the same widths (--label-w, --cols) so its cards sit over their columns.
+   --strip-shadow is the soft shadow under the names once rows pass beneath them (`is-scrolled`). */
+.compare-scroll {
+  --label-w: 150px;
+  --strip-shadow: 0 0 transparent;
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overscroll-behavior: contain;
+}
+
+.compare-table {
+  width: max(100%, calc(var(--label-w) + var(--cols) * 240px));
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.compare-table th,
+.compare-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+/* The strip of names. At the top it sits flush on the pictures' row (no line, no shadow: one head per column);
+   once rows pass under it, a line and a soft shadow set it apart. Colors only, so nothing moves. */
+.compare-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  border-bottom-color: transparent;
+  background: var(--surface);
+  box-shadow: var(--strip-shadow);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.compare-scroll.is-scrolled {
+  --strip-shadow: 0 8px 12px -10px rgb(20 24 43 / 0.3);
+}
+
+:root[data-theme='dark'] .compare-scroll.is-scrolled {
+  --strip-shadow: 0 8px 12px -10px rgb(0 0 0 / 0.7);
+}
+
+.compare-scroll.is-scrolled .compare-table thead th {
+  border-bottom-color: var(--line);
+}
+
+.compare-corner {
+  left: 0;
+  z-index: 3 !important;
+  width: var(--label-w);
+  border-right: 1px solid var(--line);
+}
+
+.compare-table tbody th[scope='row'] {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  border-right: 1px solid var(--line);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.compare-row-hint {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+.compare-section th {
+  padding: 8px 14px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.compare-section th span {
+  position: sticky;
+  left: 14px;
+}
+
+.compare-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+/* A row where the links differ: a thin mark by its name, so the eye finds it. (Rows that are the same for all
+   are folded into one line, so in practice it's the few rows that are always there that stay plain.) */
+.compare-table tr.is-diff > th[scope='row'] {
+  color: var(--text);
+  box-shadow: inset 3px 0 0 color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+/* "Same for all: Level: Beginner · Collection: Tech", one quiet line at the end of a section */
+.compare-fold > th[scope='row'],
+.compare-fold > td {
+  padding-top: 9px;
+  padding-bottom: 9px;
+  background: color-mix(in oklab, var(--surface-2) 45%, var(--surface));
+}
+
+.compare-table .compare-fold > th[scope='row'] {
+  background: color-mix(in oklab, var(--surface-2) 45%, var(--surface));
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.compare-same-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.compare-same-item {
+  max-width: 36ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-same-item + .compare-same-item::before {
+  content: '·';
+  margin: 0 9px;
+  color: var(--line-strong);
+}
+
+.compare-same-key {
+  color: var(--text-2);
+  font-weight: 600;
+}
+
+/* ---------- Cells ---------- */
+
+td.is-winner {
+  background: color-mix(in oklab, var(--success) 7%, var(--surface));
+}
+
+/* A win: a clear green chip with its icon, on its own line under the value. */
+.compare-mark {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 3px 10px 3px 8px;
+  border: 1px solid color-mix(in oklab, var(--success) 30%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--success) 14%, var(--surface));
+  color: var(--success);
+  font-size: 12.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+/* The column picked in the quick verdict lights up for a moment. */
+td.is-flash {
+  animation: compare-flash 1.6s ease-out;
+}
+
+@keyframes compare-flash {
+  0%,
+  35% {
+    box-shadow: inset 0 0 0 999px color-mix(in oklab, var(--accent) 11%, transparent);
+  }
+}
+
+.compare-none {
+  color: var(--muted);
+}
+
+.compare-sub {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Long text: a few lines (--lines), then "More" opens the whole row. */
+.compare-clamp {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: var(--lines, 2);
+}
+
+.compare-clamp.is-open {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+}
+
+.compare-note {
+  color: var(--text-2);
+  white-space: pre-line;
+}
+
+.compare-list {
+  margin: 0;
+  padding-left: 17px;
+}
+
+.compare-list li {
+  margin: 2px 0;
+}
+
+/* "More", "+4 more", "Show less" */
+.compare-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+  padding: 2px 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--accent-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* Tags: "All have" (every link) once across the columns, then each link's own: "Only here" in its territory
+   color, the ones some others share in grey. */
+.compare-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+
+.compare-tags-lead {
+  margin-right: 2px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.compare-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.compare-tag.is-common {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 600;
+}
+
+.compare-tag.is-only {
+  background: var(--hue-soft, var(--accent-soft));
+  color: var(--hue-ink, var(--accent-text));
+  font-weight: 600;
+}
+
+.compare-status button {
+  height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+/* The star is lifted (z-index 2) for the cards; here that would draw it over the sticky names and row names as it
+   scrolls under them, so it stays at the table's own level. */
+.compare-table .compare-star {
+  z-index: auto;
+  width: 34px;
+  height: 34px;
+  margin: -6px 0;
+}
+
+.compare-fav {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--warning);
+}
+
+.compare-same {
+  margin: 0;
+  padding: 28px 16px !important;
+  color: var(--muted);
+  text-align: center !important;
+}
+
+.compare-same svg {
+  vertical-align: -3px;
+}
+
+.compare-error {
+  padding: 28px 16px;
+  text-align: center;
+}
+
+@media (hover: hover) {
+  .compare-table tbody tr:not(.compare-section, .compare-fold, .compare-media-row):hover > td:not(.is-winner, .is-ai-pick) {
+    background: color-mix(in oklab, var(--surface-2) 45%, var(--surface));
+  }
+
+  .compare-more:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+/* ---------- Phones: rows of links instead of columns ---------- */
+
+/* The window fills the screen. The line under the title is for the table on a computer. */
+@media (max-width: 640px) {
+  .modal.compare-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .compare-dialog .modal-inner {
+    height: 100dvh;
+    max-height: 100dvh;
+    padding: 16px 12px 0;
+  }
+
+  .compare-dialog .modal-desc {
+    display: none;
+  }
+
+  .compare-tools {
+    gap: 8px 12px;
+    margin-bottom: 10px;
+  }
+
+  .compare-answer {
+    max-height: 32dvh;
+    overflow: auto;
+  }
+}
+
+/* The links as small chips above the rows (always in view): one line each, with their buttons. They never change
+   shape while you scroll: the scrolling box under them would change height and the rows would jump. */
+.compare-chips {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+  margin: 0 0 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.compare-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  padding: 4px 4px 4px 7px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.compare-chip.is-ai-pick {
+  border-color: color-mix(in oklab, var(--warning) 45%, var(--line));
+  background: color-mix(in oklab, var(--warning) 6%, var(--surface));
+}
+
+.compare-chip.is-loading {
+  height: 38px;
+}
+
+.compare-chip.is-loading .skeleton {
+  flex: 1;
+}
+
+.compare-chip-name {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 650;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-chip-trophy {
+  flex: none;
+  color: var(--warning);
+}
+
+.compare-chip-pick {
+  display: flex;
+  flex: none;
+}
+
+.compare-chip-pick:empty {
+  display: none;
+}
+
+/* "Pick this one" (CompareHead.jsx), small: just "Pick" here, so the name keeps its room. */
+.compare-chip-pick .compare-pick {
+  height: 28px;
+  margin-left: 0;
+  padding: 0 9px;
+  font-size: 12.5px;
+}
+
+.compare-chip-pick .compare-pick-long {
+  display: none;
+}
+
+.compare-chip-pick .compare-pick-short {
+  display: inline;
+}
+
+.compare-chip .compare-chip-open {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+}
+
+.compare-chip .compare-chip-remove {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  color: var(--muted);
+}
+
+.compare-chip-remove[aria-disabled='true'] {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* A link's small icon, at the start of each line and in the chips */
+.compare-mini-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--hue-soft, var(--surface-2));
+  color: var(--hue-ink, var(--muted));
+}
+
+.compare-mini-icon img,
+.compare-mini-icon svg {
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  object-fit: contain;
+}
+
+/* The rows scroll under the chips, edge to edge. Once they move, the line above them gets a little stronger. */
+.compare-scroll.compare-phone {
+  margin: 0 -12px;
+  padding: 12px 12px 28px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  transition: border-color 0.15s ease;
+}
+
+.compare-scroll.compare-phone.is-scrolled {
+  border-top-color: var(--line-strong);
+}
+
+.compare-psection + .compare-psection {
+  margin-top: 16px;
+}
+
+.compare-psection-title {
+  margin: 0 0 2px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.compare-prow {
+  padding: 11px 2px 12px 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.compare-prow.is-diff {
+  box-shadow: inset 3px 0 0 color-mix(in oklab, var(--accent) 45%, transparent);
+}
+
+.compare-prow-label {
+  margin: 0 0 8px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.compare-prow.is-diff .compare-prow-label {
+  color: var(--text);
+}
+
+.compare-lines {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.compare-line {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.compare-line-who {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.compare-line-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-line.is-ai-pick .compare-line-who {
+  color: var(--warning);
+}
+
+.compare-line-value {
+  min-width: 0;
+  padding-left: 29px;
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* Short values (price, level, dates…) sit beside the link's name, and so does the dash of a link without one. */
+.compare-lines.is-short {
+  gap: 7px;
+}
+
+.compare-lines.is-short .compare-line,
+.compare-line.is-empty {
+  grid-template-columns: minmax(0, 42%) minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+}
+
+.compare-lines.is-short .compare-line-who,
+.compare-line.is-empty .compare-line-who {
+  min-height: 22px;
+}
+
+.compare-lines.is-short .compare-line-value,
+.compare-line.is-empty .compare-line-value {
+  padding-left: 0;
+}
+
+.compare-line.is-winner {
+  margin: -5px -8px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--success) 7%, var(--surface));
+}
+
+.compare-line .compare-mark {
+  margin-top: 5px;
+}
+
+.compare-pfold {
+  display: grid;
+  gap: 4px;
+  margin-top: 10px;
+  padding: 9px 10px;
+  border-radius: 8px;
+  background: color-mix(in oklab, var(--surface-2) 50%, var(--surface));
+}
+
+.compare-pfold-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.compare-pskeleton {
+  display: grid;
+  gap: 22px;
+}
+
+.compare-pskeleton .skeleton {
+  display: block;
+  margin-bottom: 8px;
+}

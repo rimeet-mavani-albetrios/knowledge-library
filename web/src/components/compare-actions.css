@@ -1,0 +1,61 @@
+/* The compare window's buttons at the right of its tools row (CompareActions.jsx). "Add link" opens the
+   "Pick links to compare" window (compare-picker.css). */
+
+.compare-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.compare-actions .btn {
+  gap: 7px;
+  height: 36px;
+  padding: 0 13px;
+  font-size: 14px;
+}
+
+.compare-tool svg {
+  flex: none;
+  color: var(--text-2);
+}
+
+/* "Copied": a green check for a moment. Both words share one place, so the width doesn't change. */
+.compare-copy-label {
+  display: inline-grid;
+}
+
+.compare-copy-label > span {
+  grid-area: 1 / 1;
+  text-align: center;
+}
+
+.compare-copy-label > .is-off {
+  visibility: hidden;
+}
+
+.compare-copy.is-copied,
+.compare-copy.is-copied svg {
+  color: var(--success);
+}
+
+.compare-copy.is-copied {
+  border-color: color-mix(in oklab, var(--success) 40%, var(--line));
+}
+
+/* Phones: "Copy link" is just its icon (the tooltip and screen readers still say what it does). */
+@media (max-width: 640px) {
+  .compare-actions {
+    gap: 6px;
+  }
+
+  .compare-actions .compare-copy {
+    width: 36px;
+    padding: 0;
+  }
+
+  .compare-copy .compare-tool-label {
+    display: none;
+  }
+}

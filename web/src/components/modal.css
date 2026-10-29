@@ -28,6 +28,12 @@
   animation: modal-backdrop-in 0.18s ease-out;
 }
 
+/* Going straight from one window to another: no fade in, so nothing flashes in between. */
+.modal.is-instant[open],
+.modal.is-instant[open]::backdrop {
+  animation: none;
+}
+
 .modal.is-closing {
   animation: modal-out 0.16s ease-in forwards;
   pointer-events: none;
