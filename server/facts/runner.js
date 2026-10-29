@@ -53,10 +53,16 @@ const aiResting = () => !aiState().enabled || aiState().paused;
 
 // The kinds this link still waits for: they fit it, their keys are set, and they were never checked or are old.
 export async function pendingKinds(link, checked) {
-  return (await loadKinds()).filter(kind => hasKeys(kind) && fits(kind, link) && due(kind, checked)).map(kind => kind.kind);
+  // A kind resting until tomorrow (YouTube's daily limit) isn't waited for: the window shouldn't spin all day.
+  return (await loadKinds())
+    .filter(kind => hasKeys(kind) && !kind.resting?.() && fits(kind, link) && due(kind, checked))
+    .map(kind => kind.kind);
 }
 
 export const isCollecting = id => collecting.has(id);
+
+// Text cut in the middle of an emoji leaves half of it behind, and the database refuses such JSON.
+const toJson = value => JSON.stringify(value ?? null, (key, item) => (typeof item === 'string' ? item.toWellFormed() : item));
 
 async function saveFact(linkId, kind, value, at = new Date()) {
   const { rows } = await query(
@@ -64,7 +70,7 @@ async function saveFact(linkId, kind, value, at = new Date()) {
      ON CONFLICT (link_id) DO UPDATE SET facts = link_facts.facts || jsonb_build_object($2::text, $3::jsonb),
        checked = link_facts.checked || jsonb_build_object($2::text, $4::text), updated_at = now()
      RETURNING facts, checked`,
-    [linkId, kind, JSON.stringify(value ?? null), at.toISOString()],
+    [linkId, kind, toJson(value), at.toISOString()],
   );
   return rows[0];
 }
@@ -102,18 +108,24 @@ async function checkOne(kind, link, facts) {
     return true;
   }
   if (recording) return false;
-  const saved = await saveFact(link.id, kind.kind, value);
-  Object.assign(facts, saved.facts);
-  if (kind.changes) {
-    const rows = await Promise.resolve(kind.changes(link, old ?? null, value ?? null)).catch(err => {
-      console.warn(`Facts: ${kind.kind} changes failed for ${link.url}: ${err.message}`);
-      return [];
-    });
-    for (const row of rows ?? []) {
-      await query('INSERT INTO link_history (link_id, kind, data) VALUES ($1, $2, $3)', [link.id, row.kind, JSON.stringify(row.data ?? {})]);
+  // A value the database won't take must not stop the whole round (or the server): try this one again later.
+  try {
+    const saved = await saveFact(link.id, kind.kind, value);
+    Object.assign(facts, saved.facts);
+    if (kind.changes) {
+      const rows = await Promise.resolve(kind.changes(link, old ?? null, value ?? null)).catch(err => {
+        console.warn(`Facts: ${kind.kind} changes failed for ${link.url}: ${err.message}`);
+        return [];
+      });
+      for (const row of rows ?? []) {
+        await query('INSERT INTO link_history (link_id, kind, data) VALUES ($1, $2, $3)', [link.id, row.kind, toJson(row.data ?? {})]);
+      }
     }
+    await updateTrust(link.id, facts);
+  } catch (err) {
+    console.warn(`Facts: ${kind.kind} could not be saved for ${link.url}: ${err.message}`);
+    await retryLater(link.id, kind).catch(() => {});
   }
-  await updateTrust(link.id, facts);
   return true;
 }
 
