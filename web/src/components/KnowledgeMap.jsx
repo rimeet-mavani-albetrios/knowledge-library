@@ -6,6 +6,9 @@
 // A big library has a thousand dots or more, so they are drawn once and never redrawn: a search or filter
 // dims them all with one style change and draws only the matching dots again, on top. Hovering draws its
 // highlight on top as well. (Redrawing every dot on each click froze the page for a moment.)
+// The thousand dots are a few dozen shapes (one per category), not thousands of elements: every window that
+// opens makes the browser look at each element on the page again, and 3,000 dot elements made that slow.
+// Which dot the mouse is on comes from the dots' positions (dotNear), not from the shapes.
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api.js';
@@ -50,18 +53,28 @@ function Dot({ point, radius, halo, className = 'map-dot', delay }) {
   );
 }
 
-// Every dot, drawn once. It only draws again when the dots themselves or their size change.
+// A circle as part of a path: many of them make one shape.
+const circle = (point, r) => `M${(point.cx - r).toFixed(1)} ${point.cy.toFixed(1)}a${r} ${r} 0 1 0 ${2 * r} 0a${r} ${r} 0 1 0 ${-2 * r} 0`;
+
+// Every dot, drawn once: per category, one soft shape for the halos and one for the dots.
+// It only draws again when the dots themselves or their size change.
 const AllDots = memo(function AllDots({ placed, size }) {
+  const territories = useMemo(() => [...Map.groupBy(placed, point => point.category)], [placed]);
+  const r = Number(size.toFixed(2));
+  const halo = Number((size * 2.6).toFixed(2));
   return (
     <g className="map-all">
-      {placed.map(point => (
-        <Dot key={point.id} point={point} radius={size} halo={size * 2.6} delay={`${Math.min(point.index * 18, 900)}ms`} />
+      {territories.map(([category, points], index) => (
+        <g key={category} className="map-territory" style={{ ...hueOf(category), animationDelay: `${Math.min(index * 45, 900)}ms` }}>
+          <path className="map-halo" d={points.map(point => circle(point, halo)).join('')} />
+          <path className="map-core" d={points.map(point => circle(point, r)).join('')} />
+        </g>
       ))}
     </g>
   );
 });
 
-export default function KnowledgeMap({ params, panel = false, onOpen }) {
+function KnowledgeMap({ params, panel = false, onOpen }) {
   const map = useQuery({ queryKey: ['map'], queryFn: () => api('/map'), staleTime: 60_000 });
   const links = useLinks(params);
   const [hovered, setHovered] = useState(null);
@@ -139,12 +152,30 @@ export default function KnowledgeMap({ params, panel = false, onOpen }) {
         .map(point => <Dot key={point.id} point={point} radius={size * 1.7} halo={size * 2.6} className="map-dot is-lit" />),
     [lit, placed, size],
   );
-  const byId = useMemo(() => new Map(placed.map(point => [point.id, point])), [placed]);
-  // One listener for all the dots: which dot is under the mouse, or was clicked.
-  const dotAt = event => byId.get(event.target.closest?.('[data-id]')?.dataset.id);
-  const onPointerOver = event => setHovered(dotAt(event) ?? null);
+  // The dot nearest the mouse, within a few screen pixels (a little more forgiving than the dot itself).
+  const svgRef = useRef(null);
+  const dotNear = event => {
+    const matrix = svgRef.current?.getScreenCTM();
+    if (!matrix) return null;
+    const { x, y } = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+    let best = null;
+    let bestDistance = (9 * unit) ** 2;
+    for (const point of placed) {
+      const distance = (point.cx - x) ** 2 + (point.cy - y) ** 2;
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = point;
+      }
+    }
+    return best;
+  };
+  const onPointerMove = event => {
+    if (event.pointerType === 'touch') return;
+    const point = dotNear(event);
+    if (point?.id !== hovered?.id) setHovered(point);
+  };
   const onClick = event => {
-    const point = dotAt(event);
+    const point = dotNear(event);
     if (point) onOpen(point.id);
   };
   const names = labels.map(label => (
@@ -164,10 +195,12 @@ export default function KnowledgeMap({ params, panel = false, onOpen }) {
     <figure className={`map${lit ? ' is-narrowed' : ''}${panel ? ' is-panel' : ''}${settled ? ' is-settled' : ''}`}>
       <div className="map-frame" id="map-frame" ref={frame}>
         <svg
+          ref={svgRef}
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
           role="img"
           aria-label={`Map of the library: ${points.length} links, grouped by meaning`}
-          onPointerOver={onPointerOver}
+          className={hovered ? 'is-pointing' : undefined}
+          onPointerMove={onPointerMove}
           onPointerLeave={() => setHovered(null)}
           onClick={onClick}
         >
@@ -223,3 +256,6 @@ export default function KnowledgeMap({ params, panel = false, onOpen }) {
     </figure>
   );
 }
+
+// A thousand dots: only drawn again when the search, the filters or the map's own data change.
+export default memo(KnowledgeMap);

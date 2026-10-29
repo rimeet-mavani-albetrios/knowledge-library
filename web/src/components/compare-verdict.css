@@ -1,0 +1,207 @@
+/* The quick verdict (CompareVerdict.jsx): small cards at the top of the compare table, one above each column,
+   with what each link wins and what it's best for. On a computer the strip lines up with the columns (same
+   widths as the table, see compare-window.css) and scrolls sideways with them; on phones it's a grid of cards.
+   The cards of a line all stretch to the tallest one, so they stay even whatever their "Best for" length. */
+
+.verdict {
+  display: grid;
+  grid-template-columns: var(--label-w) repeat(var(--cols), minmax(0, 1fr));
+  width: max(100%, calc(var(--label-w) + var(--cols) * 240px));
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* It stays at the left like the row names below it. */
+.verdict-title {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  align-self: stretch;
+  margin: -10px 0;
+  padding: 22px 14px 12px;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.verdict-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
+  margin: 0 8px;
+  padding: 11px 12px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.verdict-card:last-child {
+  margin-right: 12px;
+}
+
+.verdict-card.is-ai-pick {
+  border-color: color-mix(in oklab, var(--warning) 45%, var(--line));
+  background: color-mix(in oklab, var(--warning) 6%, var(--surface));
+}
+
+.verdict-top {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  min-width: 0;
+}
+
+.verdict-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--hue-soft, var(--surface-2));
+  color: var(--hue-ink, var(--muted));
+}
+
+.verdict-icon img {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
+.verdict-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.verdict-name {
+  min-width: 0;
+  overflow: hidden;
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.verdict-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  min-height: 24px;
+}
+
+/* A win: the same green as the marks in the table. The AI's pick is warm gold. */
+.verdict-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 9px 2px 7px;
+  border: 1px solid color-mix(in oklab, var(--success) 28%, transparent);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--success) 13%, var(--surface));
+  color: var(--success);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.verdict-chip.is-ai {
+  border-color: color-mix(in oklab, var(--warning) 40%, transparent);
+  background: color-mix(in oklab, var(--warning) 18%, var(--surface));
+  color: var(--warning);
+}
+
+.verdict-none {
+  align-self: center;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Up to three lines; a longer one ends in "…" and its tooltip has all of it. */
+.verdict-best {
+  display: -webkit-box;
+  width: 100%;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.verdict-best-label {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+@media (hover: hover) {
+  .verdict-card:hover {
+    border-color: var(--line-strong);
+    background: color-mix(in oklab, var(--surface-2) 55%, var(--surface));
+  }
+
+  .verdict-card.is-ai-pick:hover {
+    border-color: color-mix(in oklab, var(--warning) 65%, var(--line));
+    background: color-mix(in oklab, var(--warning) 10%, var(--surface));
+  }
+}
+
+/* Phones: a grid of cards (two side by side). */
+@media (max-width: 640px) {
+  .verdict {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    width: auto;
+    padding: 4px 0 14px;
+    border-bottom: 0;
+    background: none;
+  }
+
+  .verdict-title {
+    grid-column: 1 / -1;
+    position: static;
+    margin: 0;
+    padding: 0 2px;
+    border-right: 0;
+    background: none;
+  }
+
+  .verdict-card,
+  .verdict-card:last-child {
+    margin: 0;
+    padding: 10px;
+  }
+
+  /* An odd last card takes the whole row instead of leaving a hole. */
+  .verdict-card:last-child:nth-child(even) {
+    grid-column: 1 / -1;
+  }
+
+  .verdict-name {
+    font-size: 14px;
+  }
+
+  .verdict-chip {
+    font-size: 11.5px;
+  }
+
+  .verdict-best {
+    font-size: 12.5px;
+  }
+}

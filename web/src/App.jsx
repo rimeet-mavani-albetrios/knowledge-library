@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUp, Lock } from 'lucide-react';
 import { api } from './api.js';
 import { useUrlState, useProgressPolling, useShortcuts, searchStep, useMediaQuery, PHONE, rememberSearch, useView } from './hooks.js';
-import { linkFilters, useLinks } from './useLinks.js';
+import { linkFilters, useKeepPlace, useLinks } from './useLinks.js';
 import Header from './components/Header.jsx';
 import SearchBar from './components/SearchBar.jsx';
 import Toolbar from './components/Toolbar.jsx';
@@ -11,6 +11,8 @@ import { useFacets } from './components/Filters.jsx';
 import LinkGrid from './components/LinkGrid.jsx';
 import KnowledgeMap from './components/KnowledgeMap.jsx';
 import LinkDrawer from './components/LinkDrawer.jsx';
+import { ComparePicker, CompareWindow } from './components/Compare.jsx';
+import { MAX_COMPARE, MIN_COMPARE, clearPicks, getPicks, removePicks, sameIds } from './compare.js';
 import AddDialog from './components/AddDialog.jsx';
 import SaveButtonDialog from './components/SaveButtonDialog.jsx';
 import LoginDialog, { LoginForm } from './components/LoginDialog.jsx';
@@ -45,6 +47,8 @@ function scrollToResults(how) {
   }
 }
 
+const SCREEN_LINKS = 20; // how many of the links on the page the compare picker offers before you type
+
 function PrivateGate({ title }) {
   return (
     <main className="gate">
@@ -60,6 +64,15 @@ function PrivateGate({ title }) {
 
 export default function App() {
   const [params, setParams] = useUrlState();
+  const paramsRef = useRef(params); // the latest address-bar state, for callbacks that never change
+  paramsRef.current = params;
+  // The search and filters without the open windows: opening or closing a link's details or the compare window
+  // doesn't touch the map, the toolbar or the list, so they aren't drawn again then.
+  const { q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort } = params;
+  const browse = useMemo(
+    () => ({ q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort, link: '', compare: '' }),
+    [q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort],
+  );
   const [addOpen, setAddOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [saveButtonOpen, setSaveButtonOpen] = useState(false);
@@ -80,6 +93,7 @@ export default function App() {
     },
   });
   const links = useLinks(params);
+  useKeepPlace(links, params);
   const busy = links.isFetching && !links.isFetchingNextPage;
   // The search's first page, for the top results in the panel under the search box. While the next search loads,
   // the last one stays there (faded) instead of blinking away; it only goes when the search is cleared.
@@ -92,9 +106,14 @@ export default function App() {
   const facets = useFacets(params);
   const [view, setView] = useView(Boolean(params.q));
   const [selecting, setSelecting] = useState(false); // picking links to change many at once
+  // The "Pick links to compare" window: 'pick' (from the toolbar, on its own) or 'edit' (from the compare window's
+  // "Add link", on top of it), or null while it's closed.
+  const [picker, setPicker] = useState(null);
   const [mapOpen, setMapOpen] = useState(false); // the map, when it waits behind the toolbar's Map button
   // The results in the order they are shown, so the detail panel's arrows can go through them.
   const ids = useMemo(() => (links.data?.pages ?? []).flatMap(page => page.items.map(link => link.id)), [links.data]);
+  // The first links on the page, in the order shown, for "On your screen" in the compare picker.
+  const screenLinks = useMemo(() => (links.data?.pages ?? []).flatMap(page => page.items).slice(0, SCREEN_LINKS), [links.data]);
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = links;
   const loadMore = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) fetchNextPage();
@@ -141,6 +160,39 @@ export default function App() {
     scrollToResults();
   }, [resultsKey]);
 
+  // Opening a link's details is a step of its own, so the Back button closes them again.
+  // Opening one of a search's results means the search was worth keeping in your recent searches.
+  const openLink = useCallback(
+    id => {
+      const now = paramsRef.current;
+      if (now.q && !now.link) rememberSearch(now.q);
+      // Only one window at a time: details replace a comparison (Back brings it back).
+      setParams({ link: id, compare: '' }, now.link ? undefined : 'link');
+    },
+    [setParams],
+  );
+  const openAdd = useCallback(() => setAddOpen(true), []);
+  const stopSelecting = useCallback(() => setSelecting(false), []);
+  const openPicker = useCallback(() => setPicker('pick'), []);
+  // The compare window closed under the picker that was changing it (Back, say): the picker goes too.
+  useEffect(() => {
+    if (picker === 'edit' && !params.compare) setPicker(null);
+  }, [picker, params.compare]);
+  const filtersDone = useCallback(() => requestAnimationFrame(() => scrollToResults('low')), []);
+  const toggleMap = useCallback(() => setMapOpen(open => !open), []);
+  const map = useMemo(() => (phone ? { open: mapOpen, onToggle: toggleMap } : null), [phone, mapOpen, toggleMap]);
+
+  // Which window is open. Going straight from one to the other (details ↔ compare, Back included, or the compare
+  // picker → compare) swaps them without their open and close animations: no flash of the page, no doubled
+  // darkness. The swap mark stays while that window is open, because taking it away would start the animation late.
+  // (The picker on top of the compare window, to change its links, is not a window of its own here.)
+  const openWindow = params.link ? 'link' : params.compare ? 'compare' : picker === 'pick' ? 'picker' : '';
+  const windowState = useRef({ open: openWindow, swapped: false });
+  if (windowState.current.open !== openWindow) {
+    windowState.current = { open: openWindow, swapped: Boolean(windowState.current.open && openWindow) };
+  }
+  const swapped = windowState.current.swapped;
+
   if (gated) return <PrivateGate title={me.data.title} />;
 
   // The search box never moves: the title, the map and the examples stay while you search,
@@ -151,13 +203,6 @@ export default function App() {
       rememberSearch(q);
       requestAnimationFrame(() => scrollToResults('top'));
     }
-  };
-  // Opening a link's details is a step of its own, so the Back button closes them again.
-  const showLink = id => setParams({ link: id }, params.link ? undefined : 'link');
-  // Opening one of a search's results means the search was worth keeping in your recent searches.
-  const openLink = id => {
-    if (params.q && !params.link) rememberSearch(params.q);
-    showLink(id);
   };
   const showTag = tag => {
     setParams({ tag, q: '', link: '' });
@@ -173,6 +218,42 @@ export default function App() {
     if (!params.link) return;
     if (window.history.state?.step === 'link') window.history.back();
     else setParams({ link: '' });
+  };
+  // Only one window is open at a time, and Back walks back through them: details → compare → details → close.
+  // Opening your picks as a comparison checks them out: the picks empty (the comparison is kept in "Recent
+  // comparisons" instead), so the toolbar's number and the cards' "In compare" marks don't linger after you close
+  // it. The window gets the picks' copies first, so it still opens filled. Other comparisons leave the picks alone.
+  const openCompare = compareIds => {
+    const picks = getPicks();
+    if (picks.length && sameIds(picks.map(pick => pick.id), compareIds)) {
+      const queryKey = ['compare', compareIds.join(',')];
+      if (!queryClient.getQueryData(queryKey) && picks.every(link => Array.isArray(link.tags))) {
+        const items = compareIds.map(id => picks.find(pick => pick.id === id));
+        queryClient.setQueryData(queryKey, { items }, { updatedAt: 0 }); // marked old: the window still asks for fresh copies
+      }
+      clearPicks();
+    }
+    setParams({ compare: compareIds.join(','), link: '' }, 'compare');
+  };
+  const closeCompare = () => {
+    if (!params.compare) return;
+    if (window.history.state?.step === 'compare') window.history.back();
+    else setParams({ compare: '' });
+  };
+  const openFromCompare = id => setParams({ link: id, compare: '' }, 'link');
+  // The links in the compare window (from the address bar). One link alone is nothing to compare.
+  const compareIds = [...new Set(params.compare.split(',').filter(Boolean))].slice(0, MAX_COMPARE);
+  if (compareIds.length < MIN_COMPARE) compareIds.length = 0;
+  // The picker opens the compare window (it closes itself without its fade then: see ComparePicker.jsx).
+  const compareFromPicker = pickedIds => {
+    setPicker(null);
+    openCompare(pickedIds);
+  };
+  // The picker changed the compare window's links. Links taken out leave your picks too, like the window's own ×.
+  const updateCompare = newIds => {
+    removePicks(compareIds.filter(id => !newIds.includes(id)));
+    if (newIds.join(',') !== compareIds.join(',')) setParams({ compare: newIds.join(',') });
+    setPicker(null);
   };
 
   return (
@@ -194,12 +275,12 @@ export default function App() {
           <SearchBar ref={searchRef} {...searchBox} />
         </section>
         {/* On phones the map waits behind the toolbar's Map button, so your links come first. */}
-        {!phone && <KnowledgeMap params={params} onOpen={openLink} />}
+        {!phone && <KnowledgeMap params={browse} onOpen={openLink} />}
         {/* The toolbar (with the chips of the filters that are on) sticks to the top while you scroll through
             the results, so this box holds both. */}
         <div className="browse" id="browse">
           <Toolbar
-            params={params}
+            params={browse}
             setParams={setParams}
             owner={owner}
             facets={facets}
@@ -207,19 +288,20 @@ export default function App() {
             onView={setView}
             selecting={selecting}
             onSelecting={setSelecting}
-            map={phone ? { open: mapOpen, onToggle: () => setMapOpen(!mapOpen) } : null}
-            onFiltersDone={() => requestAnimationFrame(() => scrollToResults('low'))}
+            onCompare={openPicker}
+            map={map}
+            onFiltersDone={filtersDone}
           />
-          {phone && mapOpen && <KnowledgeMap params={params} panel onOpen={openLink} />}
+          {phone && mapOpen && <KnowledgeMap params={browse} panel onOpen={openLink} />}
           <LinkGrid
-            params={params}
+            params={browse}
             setParams={setParams}
             owner={owner}
             onOpen={openLink}
-            onAdd={() => setAddOpen(true)}
+            onAdd={openAdd}
             view={view}
             selecting={selecting}
-            onStopSelecting={() => setSelecting(false)}
+            onStopSelecting={stopSelecting}
           />
         </div>
       </main>
@@ -232,10 +314,32 @@ export default function App() {
         onClose={closeLink}
         onOpen={openLink}
         onNearEnd={loadMore}
+        onCompare={openCompare}
+        instant={swapped}
         onTag={tag => {
           setParams({ tag, link: '' });
           requestAnimationFrame(() => scrollToResults('low'));
         }}
+      />
+      <CompareWindow
+        ids={compareIds}
+        q={params.q}
+        owner={owner}
+        instant={swapped}
+        onClose={closeCompare}
+        onOpenLink={openFromCompare}
+        onChangeIds={compareIds => setParams({ compare: compareIds.join(',') })}
+        onEditLinks={() => setPicker('edit')}
+      />
+      {/* After the compare window, so in 'edit' it opens on top of it (and messages go to the window on top). */}
+      <ComparePicker
+        mode={picker === 'edit' && !compareIds.length ? null : picker}
+        compareIds={compareIds}
+        screenLinks={screenLinks}
+        q={params.q}
+        onClose={() => setPicker(null)}
+        onCompare={compareFromPicker}
+        onUpdate={updateCompare}
       />
       {owner && <AddDialog open={addOpen} onClose={() => setAddOpen(false)} />}
       {owner && <SaveButtonDialog open={saveButtonOpen} onClose={() => setSaveButtonOpen(false)} />}

@@ -1,0 +1,382 @@
+/* A column's head in the compare window (CompareHead.jsx), in two parts: a slim strip that stays at the top
+   (icon, name, website, ×) and, in the first row under it, the preview picture and the buttons, which scroll
+   away with the facts. Nothing here changes size while you scroll. The AI's pick gets a gold frame down its column. */
+
+/* ---------- The strip (stays in view) ---------- */
+
+/* Its territory color along the top. It's sticky through compare-window.css (`thead th`); the soft shadow under it
+   once rows pass beneath (--strip-shadow) is set there too. */
+.compare-table th.compare-head {
+  --head-x: 14px;
+  padding: 9px var(--head-x);
+  box-shadow:
+    inset 0 3px 0 var(--hue, var(--line)),
+    var(--strip-shadow);
+  font-weight: 400;
+}
+
+/* Icon, name and website (and the ×), side by side, on one fixed height. */
+.compare-head-id {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 36px;
+}
+
+.compare-icon-wrap {
+  position: relative;
+  flex: none;
+}
+
+.compare-head .compare-icon {
+  width: 30px;
+  height: 30px;
+  margin: 0;
+  border-radius: 8px;
+}
+
+.compare-head .compare-icon img {
+  width: 18px;
+  height: 18px;
+}
+
+.compare-head .compare-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.compare-head-text {
+  flex: 1;
+  min-width: 0;
+}
+
+/* One line each (the whole name is in the tooltip), with set line heights, so every strip is as tall as the others
+   and as its loading shape. */
+.compare-name {
+  display: block;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+  line-height: 20px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+/* "notion.so", or "GitHub · ★ 184K · Python" (a set height too: the smaller stars text would make the line taller). */
+.compare-head-sub {
+  display: block;
+  height: 16px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compare-gh {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-gh-star {
+  margin-right: 3px;
+  color: var(--warning);
+  fill: currentColor;
+  vertical-align: -1px;
+}
+
+.compare-remove {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: 0 -6px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  transition:
+    background-color 0.15s,
+    color 0.15s;
+}
+
+.compare-remove[aria-disabled='true'] {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ---------- The picture and the buttons (the first row; scrolls away) ---------- */
+
+.compare-table td.compare-media {
+  --head-x: 14px;
+  /* The picture's height grows a little with the column's width (fewer links, wider columns), within limits. */
+  --head-pic: clamp(88px, calc((min(1280px, 100vw - 48px) - 200px) / var(--cols, 3) * 0.3), 128px);
+  padding: 4px var(--head-x) 14px;
+}
+
+/* The preview picture, like the cards', but a short band so the table's facts stay close. */
+.compare-head-media {
+  position: relative;
+  height: var(--head-pic);
+  margin-bottom: 12px;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.compare-media .preview {
+  height: var(--head-pic);
+  aspect-ratio: auto;
+  margin: 0;
+  padding: 5px;
+  border-radius: 12px;
+}
+
+.compare-media .preview-picture {
+  border-radius: 8px;
+}
+
+.compare-media .preview-tile {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+}
+
+/* Open and Details on the left, "Pick this one" at the right end. Every picture has the same height, so the
+   buttons line up across the columns. */
+.compare-head-actions {
+  container: compare-head-actions / inline-size;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+}
+
+.compare-head-actions .btn {
+  height: 30px;
+  padding: 0 11px;
+  font-size: 13.5px;
+}
+
+/* The cards lift Open above their cover button (z-index 2). Here that would draw it over the sticky strip and the
+   row names as it scrolls under them, so it stays at the table's own level. */
+.compare-media .btn-open {
+  z-index: auto;
+}
+
+/* ---------- "Pick this one" (owner only) ---------- */
+
+/* Quiet until you point at it, so it doesn't compete with Open. */
+.compare-pick {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  height: 30px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.compare-pick svg {
+  flex: none;
+  color: var(--success);
+}
+
+.compare-pick.is-done {
+  border-color: transparent;
+  background: color-mix(in oklab, var(--success) 12%, var(--surface));
+  color: var(--success);
+  cursor: default;
+}
+
+.compare-pick-short {
+  display: none;
+}
+
+/* A narrower column says just "Pick"; a very narrow one only the check (its tooltip says what it does). */
+@container compare-head-actions (max-width: 319px) {
+  .compare-pick-long {
+    display: none;
+  }
+
+  .compare-pick-short {
+    display: inline;
+  }
+}
+
+@container compare-head-actions (max-width: 234px) {
+  .compare-pick-label {
+    display: none;
+  }
+
+  .compare-pick {
+    width: 30px;
+    padding: 0;
+  }
+}
+
+/* ---------- The AI's pick: a gold badge, and a gold frame down the whole column ---------- */
+
+.compare-ai-badge {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 999px;
+  background: var(--warning);
+  color: var(--surface);
+  box-shadow: 0 1px 3px rgb(0 0 0 / 0.2);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+  animation: compare-pick-in 0.25s ease-out;
+}
+
+/* The badge's small twin on the strip's icon, so the pick is still marked once the picture has scrolled away. */
+.compare-ai-medal {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--warning);
+  color: var(--surface);
+  box-shadow: 0 0 0 2px var(--surface);
+  animation: compare-pick-in 0.25s ease-out;
+}
+
+.compare-table th.compare-head.is-ai-pick,
+.compare-table td.is-ai-pick {
+  --pick-line: color-mix(in oklab, var(--warning) 62%, transparent);
+  --pick-tint: color-mix(in oklab, var(--warning) 6%, transparent);
+  /* A see-through layer: it warms whatever color the cell already has (a winner's green, say). */
+  background-image: linear-gradient(var(--pick-tint), var(--pick-tint));
+}
+
+.compare-table td.is-ai-pick {
+  position: relative;
+}
+
+/* The frame is drawn on top of each cell (and over the line between rows), so it runs unbroken down the column,
+   from the strip through the picture's row to the last fact. */
+.compare-table th.compare-head.is-ai-pick::after,
+.compare-table td.is-ai-pick::after {
+  content: '';
+  position: absolute;
+  inset: 0 0 -1px;
+  border: 0 solid var(--pick-line);
+  border-right-width: 2px;
+  border-left-width: 2px;
+  pointer-events: none;
+}
+
+.compare-table th.compare-head.is-ai-pick::after {
+  border-top: 3px solid var(--warning);
+  border-radius: 10px 10px 0 0;
+  animation: compare-pick-in 0.25s ease-out;
+}
+
+.compare-table tbody tr:last-child td.is-ai-pick::after {
+  bottom: 0;
+  border-bottom-width: 2px;
+}
+
+@keyframes compare-pick-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* ---------- While it loads: the same shapes, so nothing moves when it arrives ---------- */
+
+.compare-head.is-loading {
+  display: table-cell;
+}
+
+.compare-skeleton-icon {
+  display: block;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+/* 18 + 6 + 12 = 36px, the loaded name and website lines. */
+.compare-skeleton-lines {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+}
+
+.compare-skeleton-picture {
+  display: block;
+  height: 100%;
+  border-radius: 12px;
+}
+
+.compare-skeleton-button {
+  display: block;
+  flex: none;
+  width: 72px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+@media (hover: hover) {
+  .compare-remove:not([aria-disabled='true']):hover {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+
+  .compare-name:hover {
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .compare-pick:not(.is-done):hover {
+    border-color: color-mix(in oklab, var(--success) 45%, var(--line));
+    background: color-mix(in oklab, var(--success) 10%, var(--surface));
+    color: var(--success);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .compare-ai-badge,
+  .compare-ai-medal,
+  .compare-table th.compare-head.is-ai-pick::after {
+    animation: none;
+  }
+}

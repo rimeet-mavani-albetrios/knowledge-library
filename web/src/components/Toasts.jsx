@@ -9,7 +9,10 @@
 // The timer pauses while the mouse (or keyboard focus) is on them.
 // The stack is a "manual popover": that puts it in the browser's top layer, so it is seen above open dialog windows
 // (the detail window, "Add links"), which would otherwise cover it with their backdrop.
+// While a window is open, the browser also locks everything outside it (no clicks, no focus), so the stack moves
+// inside that window: its buttons ("Compare now", ×) keep working there.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { CircleCheck, CircleAlert, Info, TriangleAlert, X } from 'lucide-react';
 import './toasts.css';
 
@@ -20,6 +23,12 @@ const ICONS = { success: CircleCheck, error: CircleAlert, info: Info, warning: T
 const ToastContext = createContext(Object.assign(() => '', { dismiss: () => {} }));
 export const useToast = () => useContext(ToastContext);
 
+// The open window on top, if any. An "are you sure?" question always opens above the window it's about.
+function topWindow() {
+  const open = [...document.querySelectorAll('dialog')].filter(dialog => dialog.matches(':modal'));
+  return open.find(dialog => dialog.classList.contains('confirm-dialog')) ?? open.at(-1) ?? null;
+}
+
 // How long a message stays: errors and warnings a little longer, and longer again when there is a button to click.
 function timeFor({ tone, action, duration }) {
   if (duration !== undefined) return duration;
@@ -28,6 +37,7 @@ function timeFor({ tone, action, duration }) {
 
 export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([]);
+  const [host, setHost] = useState(null); // the open window the stack sits in, or null for the page
   const list = useRef([]); // the same list, readable at once (state is only read on the next render)
   const timers = useRef(new Map()); // id -> { handle, left, started }
   const paused = useRef(false);
@@ -84,6 +94,7 @@ export function ToastProvider({ children }) {
         return same.id;
       }
       const id = `t${(count.current += 1)}`;
+      setHost(topWindow());
       const live = list.current.filter(other => !other.leaving);
       for (const old of live.slice(0, Math.max(0, live.length - (MAX - 1)))) dismiss(old.id);
       commit([...list.current, { ...toast, id }]);
@@ -93,6 +104,18 @@ export function ToastProvider({ children }) {
     };
     return Object.assign(show, { dismiss, pause, resume });
   }, []);
+
+  // The window the stack sits in has closed: back to the page (or into the window under it), so a message shown
+  // as a window closes ("Link deleted") stays in view. It watches the window's `open` attribute, which changes at
+  // once, rather than waiting for the window's close event.
+  useEffect(() => {
+    if (!host) return undefined;
+    const moveOut = () => !host.open && setHost(topWindow());
+    const observer = new MutationObserver(moveOut);
+    observer.observe(host, { attributes: true, attributeFilter: ['open'] });
+    moveOut(); // it may have closed already
+    return () => observer.disconnect();
+  }, [host]);
 
   // Keep the stack in the top layer while it has something to show. A new message puts it back on top,
   // above any dialog window opened in the meantime (the top layer is stacked in the order things were opened).
@@ -115,7 +138,7 @@ export function ToastProvider({ children }) {
     } catch {
       // Not in the top layer, then: the fixed position still shows it on the page.
     }
-  }, [toasts]);
+  }, [toasts, host]);
 
   const onBlur = useCallback(
     event => {
@@ -124,25 +147,29 @@ export function ToastProvider({ children }) {
     [api],
   );
 
+  const stack = (
+    <div
+      ref={box}
+      className="toasts"
+      role="status"
+      aria-live="polite"
+      popover="manual"
+      data-no-tip
+      onMouseEnter={api.pause}
+      onMouseLeave={api.resume}
+      onFocus={api.pause}
+      onBlur={onBlur}
+    >
+      {toasts.map(toast => (
+        <Toast key={toast.id} toast={toast} onDismiss={api.dismiss} />
+      ))}
+    </div>
+  );
+
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div
-        ref={box}
-        className="toasts"
-        role="status"
-        aria-live="polite"
-        popover="manual"
-        data-no-tip
-        onMouseEnter={api.pause}
-        onMouseLeave={api.resume}
-        onFocus={api.pause}
-        onBlur={onBlur}
-      >
-        {toasts.map(toast => (
-          <Toast key={toast.id} toast={toast} onDismiss={api.dismiss} />
-        ))}
-      </div>
+      {host?.isConnected ? createPortal(stack, host) : stack}
     </ToastContext.Provider>
   );
 }

@@ -2,12 +2,13 @@
 // your status, level, collection and tags, each in its own named section with counts.
 // Chosen filters show as chips with an × in a thin row under the toolbar (so they stay in view while you
 // scroll), and the button grows an × of its own that clears them all. The owner can rename a tag there too.
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Star, Pencil, SlidersHorizontal, Unlink, Search, Folder, BadgeDollarSign } from 'lucide-react';
 import { api } from '../api.js';
 import { facetsQuery } from '../useLinks.js';
 import { LEVEL_LABELS, MY_STATUS_LABELS } from '../format.js';
+import { PHONE } from '../hooks.js';
 import { GitHubIcon } from './Icons.jsx';
 import { useToast } from './Toasts.jsx';
 import { Popover } from './Popover.jsx';
@@ -89,6 +90,7 @@ function ActiveChip({ label, onRemove }) {
   );
 }
 
+const COLLECTIONS_SHOWN = 8; // the Collection section shows this many before "Show all"
 const EMPTY = { categories: [], sources: [], collections: [], levels: [], statuses: [], tags: [], free: 0, favorites: 0, broken: 0, total: 0 };
 const CLEAR_ALL = { source: '', free: false, favorite: false, level: '', status: '', collection: '', tag: '', broken: false };
 
@@ -155,7 +157,12 @@ function Choice({ on, onClick, children }) {
 function FiltersPanel({ params, setParams, data, onDone }) {
   const { source, collection, tag, level, status, favorite, free, broken } = params;
   const [find, setFind] = useState('');
+  const [allCollections, setAllCollections] = useState(false);
   const count = (list, value) => list.find(item => item.value === value)?.count ?? 0;
+  // The biggest collections first; the rest wait behind "Show all", plus the chosen one, so it can be turned off.
+  const collections = allCollections
+    ? data.collections
+    : data.collections.filter((item, i) => i < COLLECTIONS_SHOWN || item.value === collection);
   const sources = SOURCES.filter(([value]) => !value || count(data.sources, value) || source === value);
   const needle = find.trim().toLowerCase();
   const tags = data.tags.filter(item => !needle || item.value.toLowerCase().includes(needle)).slice(0, needle ? 40 : 18);
@@ -213,7 +220,7 @@ function FiltersPanel({ params, setParams, data, onDone }) {
 
         {(data.collections.length > 0 || collection) && (
           <Section title="Collection">
-            {data.collections.map(({ value, count: n }) => (
+            {collections.map(({ value, count: n }) => (
               <Choice key={value} on={collection === value} onClick={() => setParams({ collection: collection === value ? '' : value })}>
                 <Folder size={15} aria-hidden="true" /> {value} <span className="chip-count">{n}</span>
               </Choice>
@@ -223,6 +230,11 @@ function FiltersPanel({ params, setParams, data, onDone }) {
                 <Folder size={15} aria-hidden="true" /> {collection}
               </Choice>
             )}
+            {data.collections.length > COLLECTIONS_SHOWN ? (
+              <button type="button" className="link-btn fp-more" aria-expanded={allCollections} onClick={() => setAllCollections(!allCollections)}>
+                {allCollections ? 'Show fewer' : `Show all ${data.collections.length}`}
+              </button>
+            ) : null}
           </Section>
         )}
 
@@ -268,16 +280,46 @@ function FiltersPanel({ params, setParams, data, onDone }) {
   );
 }
 
+const ROOM = 420; // the panel wants at least this much room under its button
+const MIN_ROOM = 240;
+
+// Keeps the open panel inside the window: it's only as tall as the room under the button (its sections scroll,
+// its footer with "Show … links" stays in view). Opened low on the screen, the page first moves up a little to
+// make room; the toolbar sticks under the top bar, so that always works on a long page. Phones show a sheet instead.
+function useRoomBelow(open, button, wrap) {
+  useLayoutEffect(() => {
+    if (!open || window.matchMedia(PHONE).matches) return undefined;
+    const measure = () => {
+      const room = window.innerHeight - button.current.getBoundingClientRect().bottom - 24;
+      wrap.current.style.setProperty('--fp-room', `${Math.max(MIN_ROOM, Math.round(room))}px`);
+      return room;
+    };
+    const room = measure();
+    if (room < ROOM) {
+      window.scrollBy({ top: ROOM - room, behavior: 'instant' });
+      measure();
+    }
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure);
+    };
+  }, [open, button, wrap]);
+}
+
 // The "Filters" button in the toolbar, with a badge that says how many filters are on.
 // With filters on it becomes two buttons in one: "Filters (2)" opens the panel, the × next to it clears them all
 // (the category stays: that's the toolbar's own choice) without opening anything.
 export function FiltersButton({ params, setParams, data, onDone }) {
   const [open, setOpen] = useState(false);
   const button = useRef(null);
+  const wrap = useRef(null);
   const close = useCallback(() => setOpen(false), []);
+  useRoomBelow(open, button, wrap);
   const on = activeCount(params);
   return (
-    <div className={`dropdown filters-drop${on ? ' is-split' : ''}`}>
+    <div ref={wrap} className={`dropdown filters-drop${on ? ' is-split' : ''}`}>
       <button
         ref={button}
         type="button"
