@@ -1,0 +1,168 @@
+/* Toasts (Toasts.jsx): a small stack of cards in the bottom-right corner, full width at the bottom on phones.
+   The stack is a popover in the browser's top layer, so these rules also undo the browser's own popover look
+   (centered box with a border). */
+
+.toasts {
+  position: fixed;
+  inset: auto 20px 20px auto;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-items: stretch;
+  gap: 10px;
+  width: min(400px, calc(100vw - 40px));
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  overflow: visible;
+  background: transparent;
+  color: inherit;
+  transform: none;
+  pointer-events: none;
+}
+
+.toasts .toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14.5px;
+  font-weight: 500;
+  box-shadow: var(--shadow);
+  pointer-events: auto;
+  animation: toast-in 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root[data-theme='dark'] .toasts .toast {
+  border-color: var(--line-strong);
+}
+
+.toasts .toast.is-leaving {
+  animation: toast-out 0.2s ease-in forwards;
+  pointer-events: none;
+}
+
+/* The tone's icon in a soft colored square */
+.toast-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: color-mix(in oklab, var(--success) 15%, var(--surface));
+  color: var(--success);
+}
+
+.toast.is-error .toast-icon {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.toast.is-info .toast-icon {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.toast.is-warning .toast-icon {
+  background: color-mix(in oklab, var(--warning) 18%, var(--surface));
+  color: var(--warning);
+}
+
+.toast-text {
+  flex: 1;
+  min-width: 0;
+  padding-top: 5px;
+  display: grid;
+  gap: 2px;
+}
+
+.toast-title {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.toast-desc {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 400;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+/* Undo / Retry */
+.toast-action {
+  flex: none;
+  align-self: center;
+  height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-2);
+  color: var(--accent-text);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.toast-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  margin: 0 -2px 0 -4px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  transition: background-color 0.15s, color 0.15s;
+}
+
+@media (hover: hover) {
+  .toast-action:hover {
+    background: var(--accent-soft);
+    border-color: var(--line-strong);
+  }
+
+  .toast-close:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+}
+
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.97);
+  }
+}
+
+@media (max-width: 640px) {
+  .toasts {
+    inset: auto 12px max(12px, env(safe-area-inset-bottom)) 12px;
+    width: auto;
+    gap: 8px;
+  }
+
+  .toasts .toast {
+    padding: 11px 10px 11px 12px;
+    border-radius: 12px;
+  }
+}

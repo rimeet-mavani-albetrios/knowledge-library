@@ -7,7 +7,7 @@ import { linkFilters, useLinks } from './useLinks.js';
 import Header from './components/Header.jsx';
 import SearchBar from './components/SearchBar.jsx';
 import Toolbar from './components/Toolbar.jsx';
-import { ActiveFilters, useFacets } from './components/Filters.jsx';
+import { useFacets } from './components/Filters.jsx';
 import LinkGrid from './components/LinkGrid.jsx';
 import KnowledgeMap from './components/KnowledgeMap.jsx';
 import LinkDrawer from './components/LinkDrawer.jsx';
@@ -195,7 +195,8 @@ export default function App() {
         </section>
         {/* On phones the map waits behind the toolbar's Map button, so your links come first. */}
         {!phone && <KnowledgeMap params={params} onOpen={openLink} />}
-        {/* The toolbar sticks to the top while you scroll through the results, so this box holds both. */}
+        {/* The toolbar (with the chips of the filters that are on) sticks to the top while you scroll through
+            the results, so this box holds both. */}
         <div className="browse" id="browse">
           <Toolbar
             params={params}
@@ -219,7 +220,6 @@ export default function App() {
             view={view}
             selecting={selecting}
             onStopSelecting={() => setSelecting(false)}
-            chips={<ActiveFilters params={params} setParams={setParams} owner={owner} />}
           />
         </div>
       </main>

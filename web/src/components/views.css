@@ -1,0 +1,223 @@
+/* The compact view (small tiles, like files in a folder), the icon-only Open arrow, and the date on list rows.
+   Cards and rows themselves are styled in styles.css. */
+
+/* ---------- Compact view: many small tiles per line ---------- */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 10px;
+}
+
+.tiles.is-closest .tile {
+  opacity: 0.8;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 15px 12px 12px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+  /* A thousand tiles after a long scroll: the browser skips drawing the ones far off-screen. */
+  content-visibility: auto;
+  contain-intrinsic-size: auto 138px;
+}
+
+/* A thin line in the territory color along the top, like the label on a folder. */
+.tile::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: var(--hue);
+}
+
+.tile:has(.card-open:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tile.is-selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+.tile-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--hue-soft, var(--surface-2));
+  color: var(--hue-ink, var(--muted));
+  flex: none;
+}
+
+.tile-icon img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  border-radius: 5px;
+}
+
+.tile-title {
+  margin-top: 10px;
+  font-family: var(--display);
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.tile.is-working .tile-title {
+  color: var(--text-2);
+}
+
+.tile-host {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.tile-host > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tile-star {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  color: #e8a200;
+}
+
+.tile-star svg {
+  fill: currentColor;
+}
+
+/* The Open arrow in the top-right corner. It sits above the invisible "open details" button. */
+.btn-open-icon {
+  gap: 0;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+
+.tile .btn-open-icon {
+  position: absolute;
+  top: 9px;
+  right: 8px;
+  z-index: 2;
+}
+
+/* While selecting, the tick takes the corner and the arrow steps aside. */
+.tile .select-box {
+  top: 12px;
+  right: 10px;
+  left: auto;
+}
+
+.skeleton-tile {
+  gap: 8px;
+}
+
+.skeleton-tile .tile-icon-skeleton {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  border-radius: 12px;
+}
+
+/* ---------- List rows: the date at the right end of the meta line ---------- */
+
+.row-tags {
+  display: inline-flex;
+  gap: 10px;
+  min-width: 0;
+  padding-right: 16px;
+  overflow: hidden;
+  /* When the line is tight, the tags fade out at the end instead of being cut sharply.
+     (The fade covers only the padding, so tags that fit stay crisp.) */
+  mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+}
+
+.row-date {
+  flex: none;
+  margin-left: auto;
+  padding-left: 6px;
+  color: var(--muted);
+}
+
+/* ---------- Mouse only: a lift on hover, and the Open arrow only when the tile is pointed at ---------- */
+
+@media (hover: hover) {
+  .tile:hover {
+    border-color: color-mix(in oklab, var(--hue) 45%, var(--line));
+    box-shadow: 0 10px 24px -14px color-mix(in oklab, var(--hue) 70%, transparent);
+    transform: translateY(-1px);
+  }
+
+  .tile .btn-open-icon {
+    opacity: 0;
+    transition: opacity 0.15s, background-color 0.15s, color 0.15s;
+  }
+
+  .tile:hover .btn-open-icon,
+  .tile:focus-within .btn-open-icon {
+    opacity: 1;
+  }
+}
+
+/* ---------- Phones: three tiles per line ---------- */
+
+@media (max-width: 640px) {
+  .tiles {
+    grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+    gap: 8px;
+  }
+
+  .tile {
+    padding: 13px 10px 10px;
+    contain-intrinsic-size: auto 152px;
+  }
+
+  .tile-icon,
+  .skeleton-tile .tile-icon-skeleton {
+    width: 40px;
+    height: 40px;
+    border-radius: 11px;
+  }
+
+  .tile-title {
+    font-size: 12.5px;
+  }
+
+  .tile-host {
+    font-size: 11px;
+  }
+
+  .tile .btn-open-icon {
+    top: 7px;
+    right: 6px;
+    width: 28px;
+    height: 28px;
+  }
+}

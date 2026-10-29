@@ -21,8 +21,25 @@ export function timeAgo(date) {
   return 'just now';
 }
 
-export const fullDate = date =>
-  new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(date));
+// A missing or broken date shows as nothing instead of crashing the page ("Invalid time value").
+const validDate = date => {
+  const parsed = new Date(date);
+  return date && !Number.isNaN(parsed.getTime()) ? parsed : null;
+};
+
+// "12 Oct 2026" (day first, like most of the world writes it).
+export const fullDate = date => {
+  const parsed = validDate(date);
+  return parsed ? new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).format(parsed) : '';
+};
+
+// "12 Oct 2026, 14:35": the exact moment, for the tooltip on a date.
+export const fullDateTime = date => {
+  const parsed = validDate(date);
+  return parsed
+    ? new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(parsed)
+    : '';
+};
 
 export function hostOf(url) {
   try {
@@ -31,6 +48,9 @@ export function hostOf(url) {
     return url;
   }
 }
+
+// What to call the website in a short line: "GitHub" for a repository, else its address without "www.".
+export const siteOf = link => (link.source === 'github' ? 'GitHub' : hostOf(link.url));
 
 export const PRICING_LABELS = {
   free: 'Free',

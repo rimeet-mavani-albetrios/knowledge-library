@@ -11,6 +11,8 @@ const DEFAULTS = {
   broken: false, sort: 'newest', link: '',
 };
 const YES_NO = new Set(['exact', 'favorite', 'free', 'broken']);
+// The choices that stay with you when Back leaves a search (see useUrlState).
+const KEPT_ON_BACK = ['category', 'source', 'collection', 'tag', 'level', 'status', 'favorite', 'free', 'broken', 'sort'];
 
 function readUrl() {
   const search = new URLSearchParams(window.location.search);
@@ -22,12 +24,30 @@ function readUrl() {
   return state;
 }
 
+// The address for a state: only what differs from the defaults goes in it.
+function urlFor(state) {
+  const changed = Object.fromEntries(Object.entries(state).filter(([key, value]) => value !== DEFAULTS[key]));
+  const query = toQuery(changed);
+  return query ? `?${query}` : window.location.pathname;
+}
+
 export function useUrlState() {
   const [state, setState] = useState(readUrl);
   const current = useRef(state);
 
   useEffect(() => {
-    const onBack = () => setState((current.current = readUrl()));
+    const onBack = () => {
+      const leaving = current.current;
+      const next = readUrl();
+      // Back out of a search should only undo the search. A category (or filter, or order) picked while the
+      // search was open changed the search's own step, so the older step doesn't have it: carry it over,
+      // and write it into the address so a reload keeps it too.
+      if (leaving.q && !next.q) {
+        for (const key of KEPT_ON_BACK) next[key] = leaving[key];
+        window.history.replaceState(window.history.state, '', urlFor(next));
+      }
+      setState((current.current = next));
+    };
     window.addEventListener('popstate', onBack);
     return () => window.removeEventListener('popstate', onBack);
   }, []);
@@ -36,9 +56,7 @@ export function useUrlState() {
   const update = useCallback((changes, step) => {
     const next = { ...current.current, ...changes };
     current.current = next;
-    const changed = Object.fromEntries(Object.entries(next).filter(([key, value]) => value !== DEFAULTS[key]));
-    const query = toQuery(changed);
-    const url = query ? `?${query}` : window.location.pathname;
+    const url = urlFor(next);
     if (step) window.history.pushState({ step }, '', url);
     else window.history.replaceState(window.history.state, '', url);
     setState(next);
@@ -83,20 +101,24 @@ export function useMediaQuery(media) {
 
 export const PHONE = '(max-width: 640px)';
 
-// ---------- Cards or a list ----------
+// ---------- Cards, compact cards or a list ----------
 // Until you pick one, searches and phones get the list: many more results fit on one screen.
 // Your pick is remembered on this device.
+
+export const VIEWS = ['cards', 'compact', 'list'];
 
 export function useView(searching) {
   const phone = useMediaQuery(PHONE);
   const [choice, setChoice] = useState(() => {
     try {
-      return localStorage.getItem('kl-view') || '';
+      const saved = localStorage.getItem('kl-view');
+      return VIEWS.includes(saved) ? saved : ''; // a value from an older version of the app is ignored
     } catch {
       return '';
     }
   });
   const choose = value => {
+    if (!VIEWS.includes(value)) return;
     setChoice(value);
     try {
       localStorage.setItem('kl-view', value);
@@ -293,6 +315,8 @@ export function useShortcuts(shortcuts) {
     const onKey = event => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (event.target.closest?.('input, textarea, select, [contenteditable], dialog')) return;
+      // A window is open (details, Add links…): the page behind it shouldn't react to keys.
+      if (document.querySelector('dialog[open]')) return;
       const action = latest.current[event.key];
       if (action) {
         event.preventDefault();

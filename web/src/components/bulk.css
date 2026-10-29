@@ -1,0 +1,145 @@
+/* The selection bar (BulkBar.jsx). It sits bottom-center and stays under 720px wide, so it never
+   runs into the toasts at the bottom right. The base .bulk-* rules live in styles.css; these refine them. */
+
+.bulk-bar {
+  gap: 8px 12px;
+  max-width: min(720px, calc(100vw - 32px));
+  padding: 10px 10px 10px 16px;
+  bottom: 20px;
+  border-radius: 16px;
+  animation: bulk-in 0.2s ease-out;
+}
+
+@keyframes bulk-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+}
+
+.bulk-count {
+  align-items: center;
+  gap: 8px;
+  padding-right: 12px;
+  border-right: 1px solid var(--line);
+  font-size: 14.5px;
+}
+
+.bulk-number {
+  display: inline-grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 700;
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bulk-word {
+  color: var(--text-2);
+}
+
+.bulk-select-all {
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+
+.bulk-bar .bulk-actions .btn {
+  height: 38px;
+  padding: 0 13px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.bulk-bar .bulk-form .btn-primary {
+  height: 38px;
+}
+
+.bulk-bar .bulk-form .input {
+  width: 240px;
+  height: 38px;
+  font-size: 14.5px;
+}
+
+.bulk-bar .bulk-form .input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.bulk-bar .bulk-form .input[aria-invalid='true']:focus {
+  box-shadow: 0 0 0 3px var(--danger-soft);
+}
+
+.bulk-field {
+  display: grid;
+  gap: 4px;
+}
+
+/* Our own message under the small form (never the browser's bubble) */
+.bulk-bar .field-error {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin: 0;
+  padding-left: 2px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--danger);
+}
+
+.bulk-bar .bulk-done {
+  height: 38px;
+  margin-left: 2px;
+}
+
+@media (hover: hover) {
+  .bulk-bar .bulk-actions .btn:hover:not(:disabled) {
+    background: var(--surface-2);
+    border-color: transparent;
+    color: var(--text);
+  }
+
+  .bulk-bar .bulk-actions .bulk-delete:hover:not(:disabled) {
+    background: var(--danger-soft);
+    color: var(--danger);
+  }
+}
+
+/* Phones: the count and Done on top, three actions in one row under them (styles.css lays this out). */
+@media (max-width: 640px) {
+  .bulk-bar {
+    max-width: none;
+    padding: 10px 12px;
+    bottom: 8px;
+    animation: none;
+  }
+
+  .bulk-count {
+    padding-right: 0;
+    border-right: 0;
+  }
+
+  .bulk-bar .bulk-actions {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+  }
+
+  .bulk-bar .bulk-actions .btn {
+    height: 50px;
+    padding: 0 4px;
+    font-size: 12px;
+  }
+
+  .bulk-field {
+    flex: 1 1 140px;
+  }
+
+  .bulk-bar .bulk-form .input {
+    width: 100%;
+  }
+}

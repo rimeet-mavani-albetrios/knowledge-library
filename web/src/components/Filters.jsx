@@ -1,6 +1,7 @@
 // The "Filters" button and its panel: where links come from, "show only" (free, favorites, broken links),
 // your status, level, collection and tags, each in its own named section with counts.
-// Chosen filters show as chips with an × above the results. The owner can rename a tag there too.
+// Chosen filters show as chips with an × in a thin row under the toolbar (so they stay in view while you
+// scroll), and the button grows an × of its own that clears them all. The owner can rename a tag there too.
 import { useCallback, useRef, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Star, Pencil, SlidersHorizontal, Unlink, Search, Folder, BadgeDollarSign } from 'lucide-react';
@@ -113,12 +114,13 @@ function activeFilters(params) {
 
 export const activeCount = params => activeFilters(params).length + (params.tag ? 1 : 0);
 
-// The chips above the results: one per filter that's on, each with an ×.
+// The chips under the toolbar: one per filter that's on, each with an ×. Nothing when no filter is on.
 export function ActiveFilters({ params, setParams, owner }) {
   const active = activeFilters(params);
   if (!active.length && !params.tag) return null;
   return (
-    <div className="active-filters">
+    <div className="active-filters" aria-label="Filters that are on">
+      <span className="active-filters-label">Showing</span>
       {active.map(({ key, label, clear }) => (
         <ActiveChip key={key} label={label} onRemove={() => setParams(clear)} />
       ))}
@@ -267,13 +269,15 @@ function FiltersPanel({ params, setParams, data, onDone }) {
 }
 
 // The "Filters" button in the toolbar, with a badge that says how many filters are on.
+// With filters on it becomes two buttons in one: "Filters (2)" opens the panel, the × next to it clears them all
+// (the category stays: that's the toolbar's own choice) without opening anything.
 export function FiltersButton({ params, setParams, data, onDone }) {
   const [open, setOpen] = useState(false);
   const button = useRef(null);
   const close = useCallback(() => setOpen(false), []);
   const on = activeCount(params);
   return (
-    <div className="dropdown filters-drop">
+    <div className={`dropdown filters-drop${on ? ' is-split' : ''}`}>
       <button
         ref={button}
         type="button"
@@ -287,6 +291,11 @@ export function FiltersButton({ params, setParams, data, onDone }) {
         <span className="tool-label">Filters</span>
         {on > 0 && <span className="filters-badge">{on}</span>}
       </button>
+      {on > 0 && (
+        <button type="button" className="tool-btn is-on filters-clear" aria-label="Clear all filters" title="Clear all filters" onClick={() => setParams(CLEAR_ALL)}>
+          <X size={16} aria-hidden="true" />
+        </button>
+      )}
       <Popover open={open} onClose={close} anchor={button} label="Filters" role="dialog" className="filters-pop" focusFirst=".fp-section button, .fp-section input">
         <FiltersPanel
           params={params}

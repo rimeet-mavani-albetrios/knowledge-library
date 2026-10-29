@@ -1,10 +1,11 @@
-// The results, as cards or as a list. Loads 24 at a time and fetches the next 24 when you scroll near the bottom.
-// A search shows two groups: the best matches first, then links about something close. Only the first few related
-// links show until you ask for more, so a search is a short page.
+// The results, as cards, as small tiles or as a list. Loads 24 at a time and fetches the next 24 when you scroll
+// near the bottom. A search shows two groups: the best matches first, then links about something close. Only the
+// first few related links show until you ask for more, so a search is a short page.
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChevronDown, LoaderCircle, Plus, RefreshCw, SearchX } from 'lucide-react';
 import { linkFilters, useLinks } from '../useLinks.js';
-import LinkCard, { LinkRow } from './LinkCard.jsx';
+import LinkCard, { LinkRow, LinkTile } from './LinkCard.jsx';
+import { PeekLayer } from './Peek.jsx';
 import BulkBar from './BulkBar.jsx';
 
 function SkeletonCard() {
@@ -33,6 +34,24 @@ function SkeletonRow() {
   );
 }
 
+function SkeletonTile() {
+  return (
+    <div className="tile skeleton-tile" aria-hidden="true">
+      <span className="tile-icon-skeleton skeleton" />
+      <span className="skeleton skeleton-text" />
+      <span className="skeleton skeleton-text short" />
+    </div>
+  );
+}
+
+// `view` is 'cards', 'compact' or 'list'. Each has its own item, placeholder and layout class.
+const VIEWS = {
+  cards: { Item: LinkCard, Skeleton: SkeletonCard, layout: 'grid', skeletons: 8 },
+  compact: { Item: LinkTile, Skeleton: SkeletonTile, layout: 'tiles', skeletons: 18 },
+  list: { Item: LinkRow, Skeleton: SkeletonRow, layout: 'list', skeletons: 8 },
+};
+const viewOf = view => VIEWS[view] ?? VIEWS.cards;
+
 function Group({ title, count, hint, view, children }) {
   return (
     <section className="result-group" aria-label={title}>
@@ -40,15 +59,15 @@ function Group({ title, count, hint, view, children }) {
         {title} <span className="chip-count">{count}</span>
       </h2>
       {hint && <p className="group-hint">{hint}</p>}
-      <div className={view === 'list' ? 'list' : 'grid'}>{children}</div>
+      <div className={viewOf(view).layout}>{children}</div>
     </section>
   );
 }
 
 const RELATED_SHOWN = 6;
 
-// Keys once a result has the focus (press ↓ in the search box, or Tab): ← → go one link, ↑ ↓ one line of cards,
-// Enter opens the details, O opens the website. ↑ from the first result goes back to the search box.
+// Keys once a result has the focus (press ↓ in the search box, or Tab): ← → go one link, ↑ ↓ one line of cards
+// or tiles, Enter opens the details, O opens the website. ↑ from the first result goes back to the search box.
 function moveThroughResults(event) {
   const from = event.target;
   if (!from.classList?.contains('card-open') || event.metaKey || event.ctrlKey || event.altKey) return;
@@ -56,8 +75,8 @@ function moveThroughResults(event) {
     from.parentElement.querySelector('.btn-open')?.click();
     return;
   }
-  const layout = from.closest('.grid, .list');
-  const columns = layout?.classList.contains('grid') ? getComputedStyle(layout).gridTemplateColumns.split(' ').length : 1;
+  const layout = from.closest('.grid, .tiles, .list');
+  const columns = layout && !layout.classList.contains('list') ? getComputedStyle(layout).gridTemplateColumns.split(' ').length : 1;
   const step = { ArrowRight: 1, ArrowLeft: -1, ArrowDown: columns, ArrowUp: -columns }[event.key];
   if (!step) return;
   event.preventDefault();
@@ -67,8 +86,9 @@ function moveThroughResults(event) {
   else if (step < 0) document.querySelector('.hero input[type="search"]')?.focus();
 }
 
-// `view` is 'cards' or 'list'. `selecting` is on while you pick links to change many at once (the toolbar's
-// Select button); `onStopSelecting` turns it off. `chips` are the filters that are on, shown next to the count.
+// `view` is 'cards', 'compact' or 'list'. `selecting` is on while you pick links to change many at once (the
+// toolbar's Select button); `onStopSelecting` turns it off. `chips` are the filters that are on, shown next to
+// the count (nothing when there are none).
 export default function LinkGrid({ params, setParams, owner, onOpen, onAdd, view, selecting, onStopSelecting, chips }) {
   const { q, category, source, collection, tag, level, status, favorite, free, broken } = params;
   const query = useLinks(params);
@@ -136,14 +156,13 @@ export default function LinkGrid({ params, setParams, owner, onOpen, onAdd, view
   else if (first) summary = `${first.total} ${first.total === 1 ? 'link' : 'links'}`;
   if (!loading) lastSummary.current = summary;
 
-  const Item = view === 'list' ? LinkRow : LinkCard;
+  const { Item, Skeleton, layout, skeletons: skeletonCount } = viewOf(view);
   const item = link => (
     <Item key={link.id} link={link} owner={owner} onOpen={onOpen} selectable={selecting} selected={selected.has(link.id)} onToggle={toggle} />
   );
-  const Skeleton = view === 'list' ? SkeletonRow : SkeletonCard;
   const loadingMore = query.isLoading || isFetchingNextPage || (stale && !links.length);
-  const skeletons = loadingMore && Array.from({ length: isFetchingNextPage ? 4 : 8 }, (_, i) => <Skeleton key={`s${i}`} />);
-  const layout = view === 'list' ? 'list' : 'grid';
+  const skeletons =
+    loadingMore && Array.from({ length: isFetchingNextPage ? Math.ceil(skeletonCount / 2) : skeletonCount }, (_, i) => <Skeleton key={`s${i}`} />);
   const best = links.filter(link => link.match === 'best');
   const related = links.filter(link => link.match !== 'best');
   // Without best matches the related links are all there is, so a few more show.
@@ -243,6 +262,8 @@ export default function LinkGrid({ params, setParams, owner, onOpen, onAdd, view
         />
       )}
       {allRelated && !hasNextPage && !stale && links.length > 12 && <p className="end-note">That’s everything.</p>}
+      {/* The one hover panel for every card, row and tile. It rests while you're selecting. */}
+      <PeekLayer active={!selecting} />
     </section>
   );
 }
