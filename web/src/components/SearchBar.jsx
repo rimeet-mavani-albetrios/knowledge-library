@@ -156,7 +156,8 @@ function Panel({ id, panel, active, onPick, onHover }) {
 // so the page can bring the whole list into view. onOpenLink(id) and onTag(tag) are for the panel.
 // `results` is { page, loading } for the top results (see usePanel).
 // onDown() moves the focus to the results; it returns false when there are none.
-const SearchBar = forwardRef(function SearchBar({ value, results, onSearch, onOpenLink, onTag, onDown, busy = false, compact = false }, ref) {
+// `examples` is off while the library is empty: there is nothing yet for them to find.
+const SearchBar = forwardRef(function SearchBar({ value, results, onSearch, onOpenLink, onTag, onDown, busy = false, compact = false, examples = true }, ref) {
   const [text, setText] = useState(value);
   const debounced = useDebounced(text, PAUSE);
   const [open, setOpen] = useState(false);
@@ -285,7 +286,7 @@ const SearchBar = forwardRef(function SearchBar({ value, results, onSearch, onOp
         </form>
         {showList && <Panel id={listId} panel={panel} active={active} onPick={pick} onHover={setActive} />}
       </div>
-      {!compact && (
+      {!compact && examples && (
         <p className="examples">
           <span>Try</span>
           {EXAMPLES.map(example => (

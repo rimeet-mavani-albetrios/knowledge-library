@@ -1,6 +1,8 @@
 // The quick verdict at the top of the compare window: one small card per link, in the columns' order, with what
 // it wins (cheapest, easiest, the one you use most, most stars, and the AI's pick) and what it's best for, so you
 // can decide in a few seconds before reading the table.
+// On a computer each card sits right above its column, and the column's heading has the icon and name, so the card
+// doesn't say them again (screen readers still hear the name). On a phone there are no columns, so the card has them.
 // Props: `links` (all loaded), `wins` (per link, the marks its column won in the table: [{ key, label, Icon }],
 // so the cards and the table always agree), `aiPickId` (the AI's pick, or null), `phone`, `pending` (the website
 // facts are still loading: some marks may still come), onSelect(index) (show that link: its column on a computer,
@@ -43,10 +45,14 @@ export default function CompareVerdict({ links, wins, aiPickId, phone, pending =
             onClick={() => onSelect(i)}
             title={phone ? 'Open the details' : 'Show its column'}
           >
-            <span className="verdict-top">
-              <SiteIcon link={link} className="verdict-icon" />
-              <span className="verdict-name">{link.title}</span>
-            </span>
+            {phone ? (
+              <span className="verdict-top">
+                <SiteIcon link={link} className="verdict-icon" />
+                <span className="verdict-name">{link.title}</span>
+              </span>
+            ) : (
+              <span className="sr-only">{link.title}:</span>
+            )}
             <span className="verdict-chips">
               {aiPick ? (
                 <span className="verdict-chip is-ai">

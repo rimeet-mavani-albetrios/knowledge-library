@@ -213,7 +213,7 @@ export function IslandCard({ world, category, cardRef, onWalk, onPoint, onClose,
           <Icon size={22} />
         </span>
         <div className="explore-card-name">
-          <h2>{category}</h2>
+          <h2 title={short === category ? undefined : category}>{short}</h2>
           <span className="explore-island-count">
             {island.count.toLocaleString()} {island.count === 1 ? 'link' : 'links'}
           </span>

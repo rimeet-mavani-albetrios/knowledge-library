@@ -15,7 +15,7 @@ import CompareActions from './CompareActions.jsx';
 import CompareVerdict from './CompareVerdict.jsx';
 import { factsSection, useCompareFacts } from './CompareFacts.jsx';
 import { api } from '../api.js';
-import { CategoryBadge, hueOf } from '../categories.jsx';
+import { CategoryBadge, categoryStyle, hueOf } from '../categories.jsx';
 import { FavoriteButton, OpenButton, SiteIcon } from './LinkCard.jsx';
 import { detailQuery } from './LinkDrawer.jsx';
 import { useToast } from './Toasts.jsx';
@@ -153,7 +153,7 @@ function sectionsFor(links, owner, facts) {
           render: link => LEVEL_LABELS[link.level],
           mark: { label: 'Easiest', Icon: Sprout, wins: winners(links, link => LEVEL_RANK[link.level]) },
         },
-        { key: 'category', label: 'Category', short: true, value: link => link.category, render: link => <CategoryBadge name={link.category} /> },
+        { key: 'category', label: 'Category', short: true, value: link => link.category, text: link => categoryStyle(link.category).short, render: link => <CategoryBadge name={link.category} /> },
         { key: 'use', label: 'Use it for', value: link => link.useFor, render: link => link.useFor },
         {
           key: 'summary',

@@ -480,6 +480,7 @@ function Toolbar({
               type="button"
               className={`tool-btn${map.open ? ' is-on' : ''}`}
               aria-pressed={map.open}
+              aria-label={params.q ? 'Show the results on the map' : 'Show the map'}
               onClick={map.onToggle}
               title={params.q ? 'Show the results on the map' : 'Show the map'}
             >

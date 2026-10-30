@@ -1488,6 +1488,15 @@ kbd {
   border-radius: 0 0 var(--radius-lg) var(--radius-lg);
 }
 
+/* An empty library has no toolbar, so no tabs stand on the folder: it's a plain box. (Phones have no box at all.) */
+@media (min-width: 641px) {
+  .browse.is-empty .results {
+    margin-top: 16px;
+    border-top: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+  }
+}
+
 /* "N more": every category as a grid, with a find box on top. It hangs under the tab line, with its right side
    under "more" (Toolbar.jsx sets --pop-left). */
 .cat-pop {
@@ -2051,6 +2060,15 @@ kbd {
 
 .card-open:focus-visible {
   outline: none;
+}
+
+/* The category badge sits above that button too, so its tooltip (the long name) can show. Its click goes on to the
+   button (CategoryBadge in categories.jsx). */
+.card-meta .badge,
+.row-meta .badge {
+  position: relative;
+  z-index: 2;
+  cursor: pointer;
 }
 
 /* Goes straight to the website. It sits above the invisible "open details" button of its card or row. */

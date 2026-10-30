@@ -57,12 +57,19 @@ export const categoryColor = name => {
   return document.documentElement.dataset.theme === 'dark' ? dark : color;
 };
 
+// On cards and list rows an invisible button lies over everything (.card-open), and the badge sits above it so its
+// tooltip can show (styles.css). A click on the badge goes on to that button: it still opens the link.
+const clickCard = event => event.currentTarget.closest('article')?.querySelector('.card-open')?.click();
+
+// The short name, the same one the tabs use. The full name is its tooltip when it's longer.
+// (A name that isn't one of the categories above keeps its own words.)
 export function CategoryBadge({ name }) {
   const { Icon } = categoryStyle(name);
+  const label = CATEGORY_STYLE[name]?.short ?? name;
   return (
-    <span className="badge" style={hueOf(name)}>
+    <span className="badge" style={hueOf(name)} title={label === name ? undefined : name} onClick={clickCard}>
       <Icon size={13} aria-hidden="true" />
-      {name}
+      {label}
     </span>
   );
 }

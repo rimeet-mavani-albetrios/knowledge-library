@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUp, Lock } from 'lucide-react';
-import { api } from './api.js';
+import { api, LOGIN_NEEDED } from './api.js';
 import { useUrlState, useProgressPolling, useShortcuts, searchStep, useMediaQuery, PHONE, rememberSearch, useView } from './hooks.js';
 import { linkFilters, useKeepPlace, useLinks } from './useLinks.js';
 import Header from './components/Header.jsx';
@@ -107,6 +107,41 @@ export default function App() {
       toast('Logged out');
     },
   });
+  // A change was refused because you're logged out now (api.js): the login ran out, or you logged out in another tab.
+  // A message offers to log in again, and the page drops its owner buttons. But not under an open window: that would
+  // throw away what you typed there (a private library would even swap the whole page for its login page). So the
+  // page waits until the last window has closed.
+  useEffect(() => {
+    const refreshMe = () => queryClient.invalidateQueries({ queryKey: ['me'] });
+    const windowClosed = () => {
+      if (document.querySelector('dialog[open]')) return;
+      document.removeEventListener('close', windowClosed, true);
+      refreshMe();
+    };
+    let said = null; // the message, and when it came: one failure can come with others, and one message is enough
+    let saidAt = 0;
+    const loginNeeded = () => {
+      const inWindow = Boolean(document.querySelector('dialog[open]'));
+      if (inWindow) document.addEventListener('close', windowClosed, true); // `close` doesn't bubble, so `true` is needed
+      else refreshMe();
+      if (Date.now() - saidAt < 8000) return;
+      saidAt = Date.now();
+      toast.dismiss(said);
+      // A private library with no window open goes to its own login page right now, so no button is needed there.
+      const gateNext = !inWindow && queryClient.getQueryData(['me'])?.private;
+      said = toast({
+        title: 'You’re logged out',
+        description: 'Log in again to make changes.',
+        tone: 'warning',
+        action: gateNext ? undefined : { label: 'Log in', onClick: () => setLoginOpen(true) },
+      });
+    };
+    window.addEventListener(LOGIN_NEEDED, loginNeeded);
+    return () => {
+      window.removeEventListener(LOGIN_NEEDED, loginNeeded);
+      document.removeEventListener('close', windowClosed, true);
+    };
+  }, [queryClient, toast]);
   const links = useLinks(params);
   useKeepPlace(links, params);
   const busy = links.isFetching && !links.isFetchingNextPage;
@@ -274,6 +309,13 @@ export default function App() {
   }, [oneToCompare, gated, setParams, toast]);
   const filtersDone = useCallback(() => requestAnimationFrame(() => scrollToResults('low')), []);
   const toggleMap = useCallback(() => setMapOpen(open => !open), []);
+  // No links at all yet: the examples and the toolbar have nothing to work on, so they wait for the first link.
+  // (Not while the answer is on its way: a library with links never shows without them.)
+  const empty = me.data?.total === 0;
+  // The last link is gone: nothing is left to select, and the toolbar with its Select button is gone too.
+  useEffect(() => {
+    if (empty) stopSelecting();
+  }, [empty, stopSelecting]);
   const map = useMemo(() => (phone ? { open: mapOpen, onToggle: toggleMap } : null), [phone, mapOpen, toggleMap]);
 
   // Which window is open. Going straight from one to the other (details ↔ compare, Back included, or the compare
@@ -373,27 +415,29 @@ export default function App() {
       <main className="container page" id="links" style={statsOpen ? { display: 'none' } : undefined}>
         <section className="hero" aria-label="Search">
           <h2 className="hero-title">Find anything you saved by saying what you want to do.</h2>
-          <SearchBar ref={searchRef} {...searchBox} />
+          <SearchBar ref={searchRef} {...searchBox} examples={!empty} />
         </section>
         {/* On phones the map waits behind the toolbar's Map button, so your links come first. */}
         {!phone && <KnowledgeMap params={browse} onOpen={openLink} onExplore={openExplore} />}
         {/* The toolbar (with the chips of the filters that are on) sticks to the top while you scroll through
             the results, so this box holds both. */}
-        <div className="browse" id="browse">
-          <Toolbar
-            params={browse}
-            setParams={setParams}
-            owner={owner}
-            facets={facets}
-            view={view}
-            onView={setView}
-            selecting={selecting}
-            onSelecting={setSelecting}
-            onCompare={openPicker}
-            map={map}
-            onFiltersDone={filtersDone}
-          />
-          {phone && mapOpen && <KnowledgeMap params={browse} panel onOpen={openLink} onExplore={openExplore} />}
+        <div className={`browse${empty ? ' is-empty' : ''}`} id="browse">
+          {empty ? null : (
+            <Toolbar
+              params={browse}
+              setParams={setParams}
+              owner={owner}
+              facets={facets}
+              view={view}
+              onView={setView}
+              selecting={selecting}
+              onSelecting={setSelecting}
+              onCompare={openPicker}
+              map={map}
+              onFiltersDone={filtersDone}
+            />
+          )}
+          {phone && mapOpen && !empty && <KnowledgeMap params={browse} panel onOpen={openLink} onExplore={openExplore} />}
           <LinkGrid
             params={browse}
             setParams={setParams}

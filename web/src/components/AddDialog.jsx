@@ -339,7 +339,7 @@ function nonLinkLines(text) {
   return text
     .split(/\r?\n/)
     .map(line => line.trim())
-    .filter(line => line && !/https?:\/\//i.test(line));
+    .filter(line => line && !findUrls(line).length);
 }
 
 const EMPTY_EXTRA = { tags: '', collection: '', note: '' };

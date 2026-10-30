@@ -3,6 +3,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExter
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, toQuery } from './api.js';
 import { isWorking } from './format.js';
+import { useToast } from './components/Toasts.jsx';
 
 // ---------- Filters live in the address bar, so a search can be bookmarked or shared ----------
 
@@ -261,13 +262,18 @@ export function useCountOpen() {
   }, []);
 }
 
-// Saves a change to one link (the star, your status…). It shows on screen at once and goes back if saving fails.
+// Saves a change to one link (the star, your status…). It shows on screen at once and goes back if saving fails,
+// with a message saying why. (Logged out: App.jsx says so itself, with a "Log in" button.)
 export function useUpdateLink() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   return useMutation({
     mutationFn: ({ link, changes }) => api(`/links/${link.id}`, { method: 'PATCH', body: changes }),
     onMutate: ({ link, changes }) => patchLinks(queryClient, [{ ...link, ...changes }]),
-    onError: (error, { link }) => patchLinks(queryClient, [link]),
+    onError: (error, { link }) => {
+      patchLinks(queryClient, [link]);
+      if (error.status !== 401) toast({ title: 'Couldn’t save that change', description: error.message, tone: 'error' });
+    },
     onSuccess: ({ link }) => {
       patchLinks(queryClient, [link]);
       queryClient.invalidateQueries({ queryKey: ['facets'] });

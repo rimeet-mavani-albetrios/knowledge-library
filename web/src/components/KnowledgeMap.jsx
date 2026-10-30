@@ -28,6 +28,17 @@ const WIDTH = 1000; // the picture is drawn at this width; its height follows fr
 const PAD = 26;
 const FALLBACK_SIZE = { width: 600, height: 270 };
 
+// Things in groups, in the order they first come up. (Map.groupBy does the same, but needs Safari 17.4 or newer.)
+function groupBy(items, keyOf) {
+  const groups = new Map();
+  for (const item of items) {
+    const key = keyOf(item);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(item);
+  }
+  return groups;
+}
+
 // How big an element is on screen, kept up to date when the window changes size.
 function useBoxSize(ref, fallback) {
   const [size, setSize] = useState(fallback);
@@ -101,7 +112,7 @@ const Land = memo(function Land({ land, across }) {
 // Every dot, drawn once: per category, one shape, on one thin bright outline shape under them all.
 // It only draws again when the dots themselves or their size change.
 const AllDots = memo(function AllDots({ placed, size }) {
-  const territories = useMemo(() => [...Map.groupBy(placed, point => point.category)], [placed]);
+  const territories = useMemo(() => [...groupBy(placed, point => point.category)], [placed]);
   const outline = useMemo(() => placed.map(spot).join(''), [placed]);
   const width = Number((size * 2).toFixed(2));
   return (
@@ -119,7 +130,7 @@ const AllDots = memo(function AllDots({ placed, size }) {
 // The dots a search or filter lights up, drawn again on top of the dimmed ones: one shape per category too, because a
 // filter can match hundreds of links.
 const LitDots = memo(function LitDots({ placed, lit, size }) {
-  const groups = useMemo(() => [...Map.groupBy(placed.filter(point => lit.has(point.id)), point => point.category)], [placed, lit]);
+  const groups = useMemo(() => [...groupBy(placed.filter(point => lit.has(point.id)), point => point.category)], [placed, lit]);
   const r = Number((size * 1.9).toFixed(2));
   const halo = Number((size * 4).toFixed(2));
   return (
@@ -220,7 +231,7 @@ function KnowledgeMap({ params, panel = false, onOpen, onExplore }) {
               fontSize: (small ? 11.5 : 12.5) * unit,
             }))
         : // One label in the middle of each big category's dots.
-          [...Map.groupBy(placed, point => point.category)]
+          [...groupBy(placed, point => point.category)]
             .filter(([, members]) => members.length >= 2)
             .sort((a, b) => b[1].length - a[1].length)
             .slice(0, small ? 6 : 8)
