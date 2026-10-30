@@ -9,6 +9,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Building2, Earth, History, LoaderCircle, ShieldCheck } from 'lucide-react';
 import { api } from '../../api.js';
 import { timeAgo } from '../../format.js';
+import { onLinkFinished } from '../../hooks.js';
 import './facts.css';
 
 // `kinds`: the facts a tab shows, so an empty tab can say "Collecting facts…" while they're on their way.
@@ -31,6 +32,11 @@ export const factsQuery = id => ({ queryKey: ['facts', id], queryFn: () => api(`
 
 const asked = new Set(); // links whose missing facts we already asked the server to collect
 const answered = new Set(); // ...and the server has answered: what is still missing after that stays missing for now
+// A link the robot has just finished has more to go on, so its missing facts can be asked for once more.
+onLinkFinished(id => {
+  asked.delete(id);
+  answered.delete(id);
+});
 
 // The facts of the link on screen. When you're the owner and some were never checked, the server is asked once to
 // collect them now; while it works, the facts are loaded again every few seconds so they fill in.
@@ -41,7 +47,7 @@ export function useLinkFacts(id, owner) {
     enabled: Boolean(id),
     refetchInterval: query => (query.state.data?.collecting ? 2500 : false),
   });
-  const data = facts.data;
+  const { data, dataUpdatedAt } = facts;
   useEffect(() => {
     if (!owner || !id || !data?.pending?.length || data.collecting || asked.has(id)) return;
     asked.add(id);
@@ -54,7 +60,8 @@ export function useLinkFacts(id, owner) {
         answered.add(id);
         asked.delete(id);
       });
-  }, [id, owner, data, queryClient]);
+    // `dataUpdatedAt`: facts loaded again can look the same as before, and may still need asking for (see onLinkFinished).
+  }, [id, owner, data, dataUpdatedAt, queryClient]);
   return facts;
 }
 

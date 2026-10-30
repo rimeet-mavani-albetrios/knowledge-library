@@ -344,6 +344,15 @@ export default function App() {
     setParams({ tag, q: '', link: '' });
     requestAnimationFrame(() => scrollToResults('low'));
   };
+  // A tag in a link's details: every link with that tag, with the search gone. From the Stats page and the Explore map
+  // that means going to the library with only that tag on, as a new step, like their own clicks: Back returns there.
+  const tagFromDetails = tag => {
+    if (statsOpen) showFromStats({ tag });
+    else if (exploreOpen) {
+      setParams({ ...NO_FILTERS, tag, explore: false, focus: '', island: '', link: '' }, 'explore-pick');
+      requestAnimationFrame(() => scrollToResults('top'));
+    } else showTag(tag);
+  };
   const toResults = () => {
     const first = document.querySelector('#results .card-open');
     first?.focus();
@@ -474,15 +483,13 @@ export default function App() {
         owner={owner}
         categories={me.data?.categories ?? []}
         ids={statsOpen || exploreOpen ? [] : ids}
+        total={links.data?.pages[0]?.total}
         onClose={closeLink}
         onOpen={openLink}
         onNearEnd={loadMore}
         onCompare={openCompare}
         instant={swapped}
-        onTag={tag => {
-          setParams({ tag, link: '' });
-          requestAnimationFrame(() => scrollToResults('low'));
-        }}
+        onTag={tagFromDetails}
       />
       <CompareWindow
         ids={compareIds}

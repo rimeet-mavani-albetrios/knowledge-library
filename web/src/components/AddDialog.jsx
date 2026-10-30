@@ -9,6 +9,7 @@ import {
   Upload, CircleCheck, LoaderCircle, Clock, Copy, CircleAlert, ChevronDown, FileUp, FileText, X, Bot, RotateCcw, Globe, Info,
 } from 'lucide-react';
 import Modal from './Modal.jsx';
+import TagInput from './TagInput.jsx';
 import { api, findUrls } from '../api.js';
 import { parseBookmarks } from '../bookmarks.js';
 import { trackLinks, useTracked, useDebounced } from '../hooks.js';
@@ -19,7 +20,6 @@ import './add.css';
 const MAX_LINKS = 1000;
 const MAX_FILE_BYTES = 5_000_000;
 const SHOWN_FOUND = 100;
-const MAX_TAG_LENGTH = 40;
 
 const plural = (n, word) => `${n} ${n === 1 ? word : `${word}s`}`;
 
@@ -274,62 +274,6 @@ function FoundList({ items, states, adding, onChoose, onRemove }) {
       })}
       {items.length > SHOWN_FOUND ? <li className="found-more hint">…and {items.length - SHOWN_FOUND} more.</li> : null}
     </ul>
-  );
-}
-
-// ---------- Tags as chips ----------
-
-// Type a tag, then Enter or a comma makes it a chip. × takes one out; Backspace on an empty box takes out the last one.
-// The value given back is the comma list the server expects ("video, free").
-function TagInput({ id, value, onChange, placeholder }) {
-  const [draft, setDraft] = useState('');
-  const input = useRef(null);
-  const tags = useMemo(() => value.split(',').map(tag => tag.trim()).filter(Boolean), [value]);
-
-  function add(text) {
-    const next = [...tags];
-    for (const part of text.split(',')) {
-      const tag = part.trim().slice(0, MAX_TAG_LENGTH);
-      if (tag && !next.some(known => known.toLowerCase() === tag.toLowerCase())) next.push(tag);
-    }
-    if (next.length !== tags.length) onChange(next.join(', '));
-    setDraft('');
-  }
-
-  const remove = index => onChange(tags.filter((_, i) => i !== index).join(', '));
-
-  return (
-    <div className={`tag-input${tags.length ? ' has-tags' : ''}`} onClick={() => input.current?.focus()}>
-      {tags.map((tag, index) => (
-        <span key={tag} className="tag-chip">
-          {tag}
-          <button type="button" className="tag-chip-remove" aria-label={`Remove tag ${tag}`} onClick={() => remove(index)}>
-            <X size={13} aria-hidden="true" />
-          </button>
-        </span>
-      ))}
-      <input
-        ref={input}
-        id={id}
-        className="tag-input-field"
-        value={draft}
-        maxLength={MAX_TAG_LENGTH + 1}
-        placeholder={tags.length ? '' : placeholder}
-        autoComplete="off"
-        onChange={event => (event.target.value.includes(',') ? add(event.target.value) : setDraft(event.target.value))}
-        onBlur={() => draft.trim() && add(draft)}
-        onKeyDown={event => {
-          if (event.key === 'Enter') {
-            // Enter adds a chip here; it must not press the Add button.
-            event.preventDefault();
-            add(draft);
-          } else if (event.key === 'Backspace' && !draft && tags.length) {
-            event.preventDefault();
-            remove(tags.length - 1);
-          }
-        }}
-      />
-    </div>
   );
 }
 

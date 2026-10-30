@@ -18,6 +18,7 @@ import { Telescope } from 'lucide-react';
 import { api, toQuery } from '../api.js';
 import { categoryStyle, hueOf } from '../categories.jsx';
 import { linkFilters, useLinks } from '../useLinks.js';
+import { isHidden, useHiddenLinks } from '../deleteLater.js';
 import './knowledge-map.css';
 
 // Explore's code and its bigger map data are fetched as soon as you point at the way in, so it opens at once.
@@ -152,8 +153,11 @@ function KnowledgeMap({ params, panel = false, onOpen, onExplore }) {
   const links = useLinks(params);
   const [hovered, setHovered] = useState(null);
   const frame = useRef(null);
-  const points = map.data?.points ?? [];
-  const islands = map.data?.islands ?? NONE;
+  // Links waiting to be deleted lose their dots at once (deleteLater.js).
+  const hiding = useHiddenLinks();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const points = useMemo(() => (map.data?.points ?? []).filter(point => !isHidden(point.id)), [map.data, hiding]);
+  const islands = points.length ? (map.data?.islands ?? NONE) : NONE;
 
   // The dots pop in once. After that they stay put, even when a search moves the lit ones to the front.
   const [settled, setSettled] = useState(false);

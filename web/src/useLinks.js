@@ -1,8 +1,9 @@
 // The list of links for the current search and filters, 24 at a time.
 // The grid and the map both use this; React Query shares one copy, so it's fetched only once.
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { keepPreviousData, useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { api, toQuery } from './api.js';
+import { isWholeViewHidden, useHiddenLinks, viewKey, withoutHidden } from './deleteLater.js';
 
 export function linkFilters(params) {
   const { q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort, country, trust } = params;
@@ -31,7 +32,14 @@ export function facetsQuery(params) {
 }
 
 export function useLinks(params) {
-  return useInfiniteQuery({ ...linksQuery(params), placeholderData: keepPreviousData });
+  // Links waiting to be deleted are left out here, so the list, its numbers and the details window's arrows all go
+  // without them at once, and have them back at once after Undo (deleteLater.js).
+  const hiding = useHiddenLinks();
+  const key = viewKey(linkFilters(params));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const select = useMemo(() => data => withoutHidden(data, key), [hiding, key]);
+  const query = useInfiniteQuery({ ...linksQuery(params), placeholderData: keepPreviousData, select });
+  return query.hasNextPage && isWholeViewHidden(key) ? { ...query, hasNextPage: false } : query;
 }
 
 // ---------- Your place after a reload ----------

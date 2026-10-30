@@ -306,6 +306,22 @@
   color: var(--danger);
 }
 
+/* Edit while the robot reads, and both actions while the next link is on its way. */
+.detail-menu .menu-option[aria-disabled='true'],
+.detail-menu .menu-option[aria-disabled='true'] .menu-icon,
+.detail-menu .menu-option:disabled,
+.detail-menu .menu-option:disabled .menu-icon {
+  color: var(--muted);
+  cursor: not-allowed;
+}
+
+@media (hover: hover) {
+  .detail-menu .menu-option[aria-disabled='true']:hover,
+  .detail-menu .menu-option:disabled:hover {
+    background: transparent;
+  }
+}
+
 @media (hover: hover) {
   .menu-option.is-danger:hover {
     background: var(--danger-soft);

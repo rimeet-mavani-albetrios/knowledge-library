@@ -203,7 +203,8 @@ function LinkGrid({ params, setParams, owner, onOpen, onAdd, view, selecting, on
       onToggle={toggle}
     />
   );
-  const loadingMore = query.isLoading || isFetchingNextPage || (stale && !links.length);
+  // (Every loaded link is waiting to be deleted and there are more: those are on their way, so it isn't an empty list.)
+  const loadingMore = query.isLoading || isFetchingNextPage || (stale && !links.length) || (!q && hasNextPage && !links.length);
   const skeletons =
     loadingMore && Array.from({ length: isFetchingNextPage ? Math.ceil(skeletonCount / 2) : skeletonCount }, (_, i) => <Skeleton key={`s${i}`} />);
   const best = links.filter(link => link.match === 'best');

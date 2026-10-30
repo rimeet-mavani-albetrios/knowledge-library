@@ -36,14 +36,35 @@ function urlFor(state) {
   return query ? `?${query}` : window.location.pathname;
 }
 
+// Back and Forward would close a link's details while its edit form has unsaved changes. The browser has already
+// moved by the time the page hears of it, so the guard (holdBack) gets asked: when it says yes, the page steps back to
+// the link at once and nothing on screen changes. `goOn` makes the same move again, once you've answered.
+let backGuard = null;
+export function holdBack(guard) {
+  backGuard = guard;
+  return () => {
+    if (backGuard === guard) backGuard = null;
+  };
+}
+
 export function useUrlState() {
   const [state, setState] = useState(readUrl);
   const current = useRef(state);
+  const place = useRef(window.history.state?.at ?? 0); // which step of the history this is (each new step counts up)
 
   useEffect(() => {
-    const onBack = () => {
+    const onBack = event => {
       const leaving = current.current;
       const next = readUrl();
+      const to = event.state?.at ?? 0;
+      if (backGuard && next.link !== leaving.link) {
+        const steps = place.current - to || 1; // how far to go to get back to the link (a step from an older version has no number)
+        if (backGuard(() => window.history.go(-steps))) {
+          window.history.go(steps);
+          return;
+        }
+      }
+      place.current = to;
       // Back out of a search should only undo the search. A category (or filter, or order) picked while the
       // search was open changed the search's own step, so the older step doesn't have it: carry it over,
       // and write it into the address so a reload keeps it too.
@@ -62,7 +83,7 @@ export function useUrlState() {
     const next = { ...current.current, ...changes };
     current.current = next;
     const url = urlFor(next);
-    if (step) window.history.pushState({ step }, '', url);
+    if (step) window.history.pushState({ step, at: (place.current += 1) }, '', url);
     else window.history.replaceState(window.history.state, '', url);
     setState(next);
   }, []);
@@ -250,16 +271,22 @@ export function patchLinks(queryClient, fresh) {
   }
 }
 
-// Opening a link (its details or its website) counts as using it, so the ones you use most come up first in search,
-// and it shows in "Recently opened" at the top of the home page.
+// Opening a link's website counts as using it, so the ones you use most come up first in search, and it shows in
+// "Recently opened" and "Most used". Only looking at its details doesn't count.
 // At most once a minute per link, so going back and forth doesn't count twice.
 const counted = new Map(); // id → time
 export function useCountOpen() {
-  return useCallback(id => {
-    if (Date.now() - (counted.get(id) ?? 0) < 60_000) return;
-    counted.set(id, Date.now());
-    api(`/links/${id}/open`, { method: 'POST' }).catch(() => {});
-  }, []);
+  const queryClient = useQueryClient();
+  return useCallback(
+    id => {
+      if (Date.now() - (counted.get(id) ?? 0) < 60_000) return;
+      counted.set(id, Date.now());
+      api(`/links/${id}/open`, { method: 'POST' })
+        .then(() => queryClient.invalidateQueries({ queryKey: ['link', id] })) // "Opened 3 times" in its details
+        .catch(() => {});
+    },
+    [queryClient],
+  );
 }
 
 // Saves a change to one link (the star, your status…). It shows on screen at once and goes back if saving fails,
@@ -281,6 +308,10 @@ export function useUpdateLink() {
   });
 }
 
+// Others can hear when the robot has finished a link (the facts tabs, to ask for its missing facts again).
+const finishListeners = new Set();
+export const onLinkFinished = listener => finishListeners.add(listener);
+
 export function useProgressPolling() {
   const queryClient = useQueryClient();
   useEffect(() => {
@@ -291,17 +322,25 @@ export function useProgressPolling() {
       for (const [, data] of queryClient.getQueriesData({ queryKey: ['links'] })) {
         for (const page of data?.pages ?? []) for (const link of page.items) if (isWorking(link)) ids.add(link.id);
       }
+      // A details window opened straight from an address has a link no list knows.
+      for (const [, data] of queryClient.getQueriesData({ queryKey: ['link'] })) if (data?.link && isWorking(data.link)) ids.add(data.link.id);
       if (ids.size) {
         try {
           const { items } = await api(`/progress?ids=${[...ids].slice(0, 200).join(',')}`);
-          const finished = items.some(link => !isWorking(link));
+          const finished = items.filter(link => !isWorking(link));
           for (const link of items) if (tracked.has(link.id)) tracked.set(link.id, link);
           emit();
           patchLinks(queryClient, items);
-          if (finished) {
+          if (finished.length) {
             queryClient.invalidateQueries({ queryKey: ['facets'] });
             queryClient.invalidateQueries({ queryKey: ['me'] });
             queryClient.invalidateQueries({ queryKey: ['map'] });
+          }
+          // What was loaded while the link was being read is half empty. (`items` are list copies, without the details.)
+          for (const { id } of finished) {
+            for (const listener of finishListeners) listener(id);
+            queryClient.invalidateQueries({ queryKey: ['link', id] });
+            queryClient.invalidateQueries({ queryKey: ['facts', id] });
           }
         } catch {
           // try again on the next round

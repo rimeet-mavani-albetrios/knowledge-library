@@ -18,8 +18,10 @@ import { SeeMore, Reveal } from './SeeMore.jsx';
 import Highlight from './Highlight.jsx';
 import { useToast } from './Toasts.jsx';
 import { useConfirm } from './Confirm.jsx';
-import { patchLinks, useUpdateLink, useCountOpen } from '../hooks.js';
-import { MAX_COMPARE, forgetLinks, togglePick, useComparePicks } from '../compare.js';
+import { holdBack, patchLinks, useUpdateLink, useCountOpen } from '../hooks.js';
+import { MAX_COMPARE, togglePick, useComparePicks } from '../compare.js';
+import { isHidden, useDeleteLater, useHiddenLinks } from '../deleteLater.js';
+import TagInput from './TagInput.jsx';
 import FactsTabs, { Glance, factsBusy, factsQuery, useLinkFacts } from './facts/FactsTabs.jsx';
 import {
   compactNumber, fullDate, hostOf, timeAgo, PRICING_LABELS, STATUS_LABELS, LEVEL_LABELS, MY_STATUS_LABELS, isWorking,
@@ -32,6 +34,7 @@ const LONG_TITLE = 64; // letters: a name longer than this gets a smaller size, 
 const LONG_SUMMARY = 320; // letters: only a summary you wrote yourself gets this long; it opens with a button
 const SIDE_GAP = 20; // the side column's bottom stays this far from the window's bottom edge while it sticks
 const DISCARD = { title: 'Throw away your changes?', message: 'What you typed in the form will be lost.', confirmLabel: 'Throw away', danger: true };
+const STILL_READING = 'You can edit this link once the robot has finished reading it.';
 
 // The same key and request everywhere, so a link loaded ahead is found again when you reach it.
 export const detailQuery = (id, q) => ({ queryKey: ['link', id, q], queryFn: () => api(`/links/${id}?${toQuery({ q })}`) });
@@ -166,7 +169,10 @@ function CopyLink({ url }) {
 
 // The ••• button: the owner's less common actions, tucked away so the bar stays calm. It is one of our own menus,
 // so on phones it slides up from the bottom of the screen like the others. Keys: ↑ ↓ move, Enter picks, Esc closes.
-function OwnerMenu({ onEdit, onDelete, deleting }) {
+// `waiting`: the next link is on its way, so nothing here acts on the one about to leave.
+// `editOff` is why Edit can't be used right now. It stays on the menu and says so when picked (phones have no tooltips).
+function OwnerMenu({ onEdit, onDelete, waiting, editOff }) {
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const button = useRef(null);
@@ -203,11 +209,19 @@ function OwnerMenu({ onEdit, onDelete, deleting }) {
       </button>
       <Popover open={open} onClose={close} anchor={button} label="More actions" role="menu" className="detail-menu" focusFirst="[role='menuitem']">
         <div onKeyDown={onKey}>
-          <button type="button" role="menuitem" className="menu-option" onClick={() => pick(onEdit)}>
+          <button
+            type="button"
+            role="menuitem"
+            className="menu-option"
+            disabled={waiting}
+            aria-disabled={editOff ? true : undefined}
+            title={editOff || undefined}
+            onClick={() => pick(editOff ? () => toast({ title: editOff, tone: 'info' }) : onEdit)}
+          >
             <Pencil size={16} aria-hidden="true" className="menu-icon" />
             <span className="menu-text">Edit</span>
           </button>
-          <button type="button" role="menuitem" className="menu-option is-danger" disabled={deleting} onClick={() => pick(onDelete)}>
+          <button type="button" role="menuitem" className="menu-option is-danger" disabled={waiting} onClick={() => pick(onDelete)}>
             <Trash2 size={16} aria-hidden="true" className="menu-icon" />
             <span className="menu-text">Delete</span>
           </button>
@@ -377,15 +391,28 @@ const formFrom = link => ({
   tasks: link.tasks.join('\n'),
 });
 
+// What the form sends for each field: spaces around a title or an empty line in a list are no change.
+const toSend = form => ({ ...form, title: form.title.trim(), tags: splitList(form.tags, ','), tasks: splitList(form.tasks, '\n') });
+
+// Only the fields you changed since the form opened, so a save never puts back an old copy of the others, and tags you
+// didn't touch aren't marked as your own.
+function changesIn(form, start) {
+  const was = toSend(start);
+  return Object.fromEntries(Object.entries(toSend(form)).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(was[key])));
+}
+
 // `onDirty` tells the window whether there are unsaved changes, so closing or moving on asks first.
 function EditForm({ link, categories, onDone, onDirty }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
   const titleRef = useRef(null);
-  const [form, setForm] = useState(() => formFrom(link));
+  const [start] = useState(() => formFrom(link)); // the form as it opened
+  const [form, setForm] = useState(start);
   const [titleError, setTitleError] = useState('');
-  const dirty = JSON.stringify(form) !== JSON.stringify(formFrom(link));
+  const [typingTag, setTypingTag] = useState(false); // letters in the tags box that aren't a chip yet
+  const changes = changesIn(form, start);
+  const dirty = typingTag || Object.keys(changes).length > 0;
   useEffect(() => {
     onDirty(dirty);
     return () => onDirty(false);
@@ -396,11 +423,7 @@ function EditForm({ link, categories, onDone, onDirty }) {
   }, []);
 
   const save = useMutation({
-    mutationFn: () =>
-      api(`/links/${link.id}`, {
-        method: 'PATCH',
-        body: { ...form, title: form.title.trim(), tags: splitList(form.tags, ','), tasks: splitList(form.tasks, '\n') },
-      }),
+    mutationFn: () => api(`/links/${link.id}`, { method: 'PATCH', body: changes }),
     onSuccess: ({ link: saved }) => {
       patchLinks(queryClient, [saved]);
       queryClient.invalidateQueries({ queryKey: ['facets'] });
@@ -419,7 +442,8 @@ function EditForm({ link, categories, onDone, onDirty }) {
       titleRef.current?.focus();
       return;
     }
-    save.mutate();
+    if (Object.keys(changes).length) save.mutate();
+    else onDone(); // nothing to save
   };
   const cancel = async () => {
     if (dirty && !(await confirm(DISCARD))) return;
@@ -464,12 +488,15 @@ function EditForm({ link, categories, onDone, onDirty }) {
           <input className="input" maxLength={80} {...field('collection')} placeholder="Video tools" />
         </label>
       </div>
-      <label>
-        <span className="detail-field-name">
-          Tags <span className="hint">separate with commas</span>
-        </span>
-        <input className="input" {...field('tags')} placeholder="video, free, editing" />
-      </label>
+      {/* Not wrapped in its <label>: a click on a label presses the first button in it, here a chip's ×. */}
+      <div className="detail-field">
+        <label htmlFor="detail-tags">
+          <span className="detail-field-name">
+            Tags <span className="hint">Enter or a comma adds a tag</span>
+          </span>
+        </label>
+        <TagInput id="detail-tags" value={form.tags} onChange={tags => setForm({ ...form, tags })} placeholder="video, free, editing" onTyping={setTypingTag} />
+      </div>
       <label>
         <span className="detail-field-name">
           Summary <span className="hint">up to 1000 letters</span>
@@ -554,7 +581,8 @@ function MoreDetails({ link, headings }) {
 // `ids` are the results on screen, in order, so the arrows can go to the one before or after.
 // `onNearEnd` loads more results when you reach the last ones.
 // `instant`: the window swaps in without its fade (coming straight from the compare window).
-export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose, onOpen, onTag, onNearEnd, onCompare, instant = false }) {
+// `total` is how many results there really are, when the server has said so (only some of them may be loaded yet).
+export default function LinkDrawer({ id, q, owner, categories, ids = [], total, onClose, onOpen, onTag, onNearEnd, onCompare, instant = false }) {
   const ref = useRef(null);
   const bodyRef = useRef(null); // the one scrolling area
   const sideRef = useRef(null);
@@ -562,9 +590,10 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   const nameRef = useRef(null); // the big name
   const pressedBackdrop = useRef(false); // the click that closes must start AND end on the dark background
   const queryClient = useQueryClient();
-  const toast = useToast();
   const confirm = useConfirm();
   const countOpen = useCountOpen();
+  const deleteLater = useDeleteLater();
+  useHiddenLinks(); // a link deleted a moment ago isn't offered in "Similar"; Undo brings it back
   const [editing, setEditing] = useState(false);
   const dirty = useRef(false); // the edit form has unsaved changes
   const setDirty = useCallback(value => {
@@ -593,7 +622,7 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   const link = detail.data?.link;
   const hasLink = Boolean(link);
   const similarLoading = detail.data?.similar === null; // shown from the list; the similar links are on their way
-  const similar = detail.data?.similar ?? [];
+  const similar = (detail.data?.similar ?? []).filter(other => !isHidden(other.id));
   const switching = detail.isPlaceholderData && !similarLoading;
   useEffect(() => {
     shown.current = Boolean(id && link);
@@ -641,9 +670,7 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   }, [id]);
   useEffect(() => {
     setEditing(false);
-    // Opening a link counts as using it, so the ones you use most come up first in search.
-    if (id && owner) countOpen(id);
-  }, [id, owner, countOpen]);
+  }, [id]);
 
   // Each new link starts at the top of the window.
   useLayoutEffect(() => {
@@ -713,10 +740,21 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   const leave = useCallback(
     async action => {
       if (editing && dirty.current && !(await confirm(DISCARD))) return;
+      dirty.current = false;
       setEditing(false);
       action();
     },
     [editing, confirm],
+  );
+  // Back and Forward leave the link too, so they ask the same question.
+  useEffect(
+    () =>
+      holdBack(goOn => {
+        if (!dirty.current) return false;
+        leave(goOn);
+        return true;
+      }),
+    [leave],
   );
   const go = useCallback(to => to && leave(() => onOpen(to)), [leave, onOpen]);
   const close = () => leave(onClose);
@@ -755,7 +793,7 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   }, [id, editing, previous, next, go]);
 
   // Hidden on 2026-10-28: a periodic background refresh is planned instead.
-  // Needs `trackLinks` from ../hooks.js and `RefreshCw` from lucide-react when it comes back.
+  // Needs `trackLinks` from ../hooks.js, `RefreshCw` from lucide-react and `useToast()` when it comes back.
   // const refresh = useMutation({
   //   mutationFn: () => api(`/links/${id}/refresh`, { method: 'POST' }),
   //   onSuccess: ({ link: queued }) => {
@@ -770,27 +808,18 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   //   <RefreshCw size={18} />
   // </button>
 
-  const remove = useMutation({
-    mutationFn: () => api(`/links/${id}`, { method: 'DELETE' }),
-    onSuccess: () => {
-      // It leaves your compare picks and recent comparisons too, and an open comparison gets fresh copies.
-      forgetLinks([id]);
-      queryClient.removeQueries({ queryKey: ['link', id] });
-      for (const key of ['links', 'facets', 'me', 'map', 'compare', 'compare-facts']) queryClient.invalidateQueries({ queryKey: [key] });
-      toast('Link deleted');
-      onClose();
-    },
-    onError: error => toast(error.message, 'error'),
-  });
-
+  // Always the link the question names, the one on screen (`id` may already be the next one, while it loads).
   async function removeLink() {
     const sure = await confirm({
       title: 'Delete this link?',
-      message: `“${link.title}” will be removed from your library. This can’t be undone.`,
+      message: `“${link.title}” will be removed from your library. You’ll have a few seconds to undo it.`,
       confirmLabel: 'Delete',
       danger: true,
     });
-    if (sure) remove.mutate();
+    if (!sure) return;
+    deleteLater([link.id], { title: 'Link deleted', description: link.title });
+    dirty.current = false;
+    onClose();
   }
 
   // The edit form sits where the name was, at the top of the window, wherever you were when you asked for it.
@@ -811,7 +840,10 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
       ref={ref}
       className={`detail${instant ? ' is-instant' : ''}`}
       aria-label={link ? link.title : 'Link details'}
-      onClose={onClose}
+      onClose={() => {
+        // A slow page can hear of a close late, when Back has opened the window again by then: that one means nothing.
+        if (!ref.current.open) onClose();
+      }}
       onCancel={event => {
         // Esc: ask about unsaved changes before the window goes.
         if (editing && dirty.current) {
@@ -842,7 +874,7 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
                     <ChevronLeft size={20} aria-hidden="true" />
                   </button>
                   <span className="detail-pos">
-                    {position + 1} <span>of</span> {ids.length}
+                    {position + 1} <span>of</span> {Math.max(total ?? 0, ids.length).toLocaleString('en')}
                   </span>
                   <button type="button" className="icon-btn" onClick={() => go(next)} disabled={!next} aria-label="Next result" title="Next result (→)">
                     <ChevronRight size={20} aria-hidden="true" />
@@ -869,7 +901,7 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
                     <CopyLink key={link.id} url={link.url} />
                     <CompareToggle link={link} onCompare={compareThis} className="detail-wide" />
                     <OpenWebsite link={link} owner={owner} className="detail-wide" />
-                    {owner ? <OwnerMenu onEdit={startEditing} onDelete={removeLink} deleting={remove.isPending} /> : null}
+                    {owner ? <OwnerMenu onEdit={startEditing} onDelete={removeLink} waiting={switching} editOff={isWorking(link) ? STILL_READING : ''} /> : null}
                     <span className="detail-tools-line" aria-hidden="true" />
                   </>
                 ) : null}
@@ -911,7 +943,16 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
                           {link.title}
                         </h2>
                         <p className="detail-where">
-                          <a className="detail-url" href={link.url} target="_blank" rel="noopener noreferrer" title={link.url}>
+                          <a
+                            className="detail-url"
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            title={link.url}
+                            onClick={() => {
+                              if (owner) countOpen(link.id);
+                            }}
+                          >
                             <SiteIcon link={link} className="detail-url-icon" />
                             <span className="detail-host">{hostOf(link.url)}</span>
                             {path ? <span className="detail-path">{path}</span> : null}

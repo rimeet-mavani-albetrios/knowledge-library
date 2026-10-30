@@ -1,5 +1,6 @@
 // The bar at the bottom of the screen while you select links: add a tag to all of them, move them to a collection,
-// or delete them. Deleting asks first in our own window (never the browser's confirm()).
+// or delete them. Deleting asks first in our own window (never the browser's confirm()), and then offers Undo for a
+// few seconds before the links are really deleted (deleteLater.js).
 // "Select all" picks every link in the view (its category, filters and order, or all the results of a search), also
 // the ones further down that aren't loaded yet: it asks the server for their ids, so the number on the button is the
 // real one, the same as "26 links found". Only "the nearest links" of a search that found nothing close has no such
@@ -9,7 +10,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CircleAlert, Folder, Hash, LoaderCircle, Trash2, X } from 'lucide-react';
 import { api, toQuery } from '../api.js';
-import { forgetLinks } from '../compare.js';
+import { isHidden, useDeleteLater } from '../deleteLater.js';
 import { useToast } from './Toasts.jsx';
 import { useConfirm } from './Confirm.jsx';
 import './bulk.css';
@@ -23,13 +24,11 @@ const DONE = {
   tag: n => `Tag added to ${plural(n, 'link')}`,
   collection: n => `${plural(n, 'link')} moved`,
   refresh: n => `Reading ${plural(n, 'link')} again…`,
-  delete: n => `${plural(n, 'link')} deleted`,
 };
 
 const WORKING = {
   tag: n => `Adding the tag to ${plural(n, 'link')}…`,
   collection: n => `Moving ${plural(n, 'link')}…`,
-  delete: n => `Deleting ${plural(n, 'link')}…`,
 };
 
 // `ids` are the selected links (also ones not loaded yet, after "Select all"); `shownIds` the ones on screen.
@@ -39,6 +38,7 @@ export default function BulkBar({ ids, shownIds, view, onSelect, onDone }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
+  const deleteLater = useDeleteLater();
   const [step, setStep] = useState(null); // null | 'tag' | 'collection'
   const [value, setValue] = useState('');
   const [error, setError] = useState(''); // our own message under the small form
@@ -60,9 +60,7 @@ export default function BulkBar({ ids, shownIds, view, onSelect, onDone }) {
   const change = useMutation({
     // The links travel with the action, so the answer is about exactly the links that were sent.
     mutationFn: ({ ids: chosen, action, value: text = '' }) => api('/links/bulk', { method: 'POST', body: { ids: chosen, action, value: text } }),
-    onSuccess: ({ changed }, { ids: chosen, action }) => {
-      // Deleted links leave your compare picks and recent comparisons too.
-      if (action === 'delete') forgetLinks(chosen);
+    onSuccess: ({ changed }, { action }) => {
       // Everything that shows these links, an open comparison and its website facts included.
       for (const key of ['links', 'link', 'facets', 'me', 'map', 'compare', 'compare-facts']) queryClient.invalidateQueries({ queryKey: [key] });
       toast(DONE[action](changed));
@@ -98,7 +96,7 @@ export default function BulkBar({ ids, shownIds, view, onSelect, onDone }) {
     try {
       const { ids: every, capped, max } = await api(`/links/ids?${toQuery(view.filters)}`);
       if (!mounted.current || latestView.current !== asked) return; // that selection is gone meanwhile
-      onSelect(new Set(every));
+      onSelect(new Set(every.filter(id => !isHidden(id)))); // not the ones you just deleted
       if (capped) {
         toast({
           title: `Selected the first ${number(max)} links`,
@@ -133,11 +131,15 @@ export default function BulkBar({ ids, shownIds, view, onSelect, onDone }) {
     if (!count) return;
     const yes = await confirm({
       title: `Delete ${plural(count, 'link')}?`,
-      message: 'This can’t be undone.',
+      message: 'You’ll have a few seconds to undo it.',
       confirmLabel: 'Delete',
       danger: true,
     });
-    if (yes) change.mutate({ ids, action: 'delete' });
+    if (!yes) return;
+    deleteLater(ids, { title: `${plural(count, 'link')} deleted`, wholeView: view && count >= view.total ? view.filters : null });
+    setStep(null);
+    setValue('');
+    onSelect(new Set());
   }
 
   return (
