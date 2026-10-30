@@ -3,8 +3,11 @@
 //   { kind, everyDays, perRun, needs: ['ENV_NAME'], async collect(link, facts, ctx) → value | null,
 //     async changes?(link, oldValue, newValue) → [{ kind, data }] }
 // and optionally `sources` (['web'] = only websites, not GitHub or YouTube links), `order` (lower runs first, so a
-// kind can use another one's result) and `ai: true` (it asks the free AI, so it waits while the AI rests).
-// collect() returning null means "checked, nothing found". Throwing means "try again in about a day".
+// kind can use another one's result), `ai: true` (it asks the free AI, so it waits while the AI rests),
+// `follows: ['company']` (worked out again whenever those kinds' answers change, even when not due yet) and
+// `async saved(link, oldValue, newValue)` (runs after its answer is saved; place.js tells other pages of the website).
+// collect() returning null means "checked, nothing found". Throwing means "try again in about a day"; an error with
+// `retryAt` (a time in ms, like GitHub's hourly limit) means "try again then", without a warning in the log.
 // After any change the trust grade (trust.js) is worked out again.
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -75,9 +78,10 @@ async function saveFact(linkId, kind, value, at = new Date()) {
   return rows[0];
 }
 
-// Something went wrong (a website was slow): keep the old value and try again in about a day.
-async function retryLater(linkId, kind) {
-  const at = new Date(Date.now() - Math.max((kind.everyDays ?? 30) - 1, 0) * DAY);
+// Something went wrong (a website was slow): keep the old value and try again in about a day, or at `when`.
+// "Checked" is written as if it happened everyDays before that moment, so the link is due again right then.
+async function retryLater(linkId, kind, when = Date.now() + DAY) {
+  const at = new Date(Math.min(when, Date.now() + DAY) - (kind.everyDays ?? 30) * DAY);
   await query(
     `INSERT INTO link_facts (link_id, checked) VALUES ($1, jsonb_build_object($2::text, $3::text))
      ON CONFLICT (link_id) DO UPDATE SET checked = link_facts.checked || jsonb_build_object($2::text, $3::text)`,
@@ -103,6 +107,10 @@ async function checkOne(kind, link, facts) {
     value = await aiTask.run({ key: `${kind.kind}:${link.id}`, n: 0 }, () => kind.collect(link, facts, siteContext(link)));
   } catch (err) {
     if (err instanceof AiPaused || recording) return false;
+    if (err.retryAt) {
+      await retryLater(link.id, kind, err.retryAt);
+      return false;
+    }
     console.warn(`Facts: ${kind.kind} failed for ${link.url}: ${err.message}`);
     await retryLater(link.id, kind);
     return true;
@@ -121,6 +129,11 @@ async function checkOne(kind, link, facts) {
         await query('INSERT INTO link_history (link_id, kind, data) VALUES ($1, $2, $3)', [link.id, row.kind, toJson(row.data ?? {})]);
       }
     }
+    if (kind.saved) {
+      await Promise.resolve(kind.saved(link, old ?? null, value ?? null)).catch(err =>
+        console.warn(`Facts: ${kind.kind} follow-up failed for ${link.url}: ${err.message}`),
+      );
+    }
     await updateTrust(link.id, facts);
   } catch (err) {
     console.warn(`Facts: ${kind.kind} could not be saved for ${link.url}: ${err.message}`);
@@ -133,11 +146,19 @@ async function checkOne(kind, link, facts) {
 // use the earlier ones' results (company uses wikidata, age uses archive). Gives back the kinds that were done.
 async function checkLink(link, facts, kinds) {
   const done = [];
+  const changed = new Set(); // kinds whose answer is different now
   for (const order of [...new Set(kinds.map(kind => kind.order ?? 50))]) {
     const group = kinds.filter(kind => (kind.order ?? 50) === order && !(kind.ai && aiResting()) && !kind.resting?.());
+    const before = group.map(kind => toJson(facts[kind.kind]));
     const results = await Promise.all(group.map(kind => checkOne(kind, link, facts)));
     done.push(...group.filter((kind, i) => results[i]).map(kind => kind.kind));
+    group.forEach((kind, i) => toJson(facts[kind.kind]) !== before[i] && changed.add(kind.kind));
   }
+  // Kinds made from other kinds' answers (place uses company and wikidata) are worked out again when those changed.
+  const followers = (await loadKinds()).filter(
+    kind => !kinds.includes(kind) && kind.follows?.some(name => changed.has(name)) && hasKeys(kind) && fits(kind, link),
+  );
+  for (const kind of followers) if (await checkOne(kind, link, facts)) done.push(kind.kind);
   return done;
 }
 

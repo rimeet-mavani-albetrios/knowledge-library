@@ -20,7 +20,7 @@ import { FavoriteButton, OpenButton, SiteIcon } from './LinkCard.jsx';
 import { detailQuery } from './LinkDrawer.jsx';
 import { useToast } from './Toasts.jsx';
 import { PHONE, useMediaQuery, useUpdateLink } from '../hooks.js';
-import { MIN_COMPARE, rememberComparison, removePicks, useComparePicks } from '../compare.js';
+import { MIN_COMPARE, rememberComparison, removePicks, useComparePicks, wasDeleted } from '../compare.js';
 import { compactNumber, fullDate, timeAgo, LEVEL_LABELS, MY_STATUS_LABELS, PRICING_LABELS } from '../format.js';
 import './compare-window.css';
 
@@ -386,6 +386,70 @@ function SameForAll({ items }) {
   );
 }
 
+// The AI's answer to "Which should I pick?": its pick, why, and when to choose each of the others. On a phone it
+// starts as one line ("Best pick: …") with "Why?" for the rest, and sits at the top of the rows, scrolling away
+// with them, so the rows keep most of the small screen. `open` and onToggle belong to the window (a new answer
+// starts folded again); onHide() takes the answer away.
+function AiAnswer({ answer, titleOf, phone, open, onToggle, onHide }) {
+  return (
+    <div className={`compare-answer${open ? '' : ' is-folded'}`} role="status">
+      <span className="compare-answer-icon" aria-hidden="true">
+        <Trophy size={phone ? 16 : 18} />
+      </span>
+      <div className="compare-answer-body">
+        <div className="compare-answer-line">
+          <p className="compare-answer-pick">
+            Best pick: <strong>{titleOf(answer.pickId)}</strong>
+          </p>
+          {phone ? (
+            <button type="button" className="compare-more compare-answer-why" aria-expanded={open} onClick={onToggle}>
+              {open ? 'Less' : 'Why?'}
+              {open ? <ChevronUp size={14} aria-hidden="true" /> : <ChevronDown size={14} aria-hidden="true" />}
+            </button>
+          ) : null}
+        </div>
+        {open ? (
+          <>
+            {answer.reason ? <p>{answer.reason}</p> : null}
+            {answer.others?.length ? (
+              <ul>
+                {answer.others.map(other => (
+                  <li key={other.id}>
+                    <strong>{titleOf(other.id)}:</strong> {other.when}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+            <p className="compare-answer-note">
+              <Info size={13} aria-hidden="true" /> Written by the free AI from what your library knows. Check before you decide.
+            </p>
+          </>
+        ) : null}
+      </div>
+      <button type="button" className="icon-btn icon-btn-sm" onClick={onHide} aria-label="Hide the AI's answer" title="Hide">
+        <X size={16} aria-hidden="true" />
+      </button>
+    </div>
+  );
+}
+
+const compareDialog = () => document.querySelector('dialog.compare-dialog'); // the window itself (Modal.jsx)
+
+// After the button that had the focus went away (its column taken out, the AI's answer hidden), the focus goes
+// to the nearest thing that does the same job, so keyboard users stay where they were instead of starting over
+// at the top of the page. `target` is a button to focus, or null for the window's title.
+function moveFocus(dialog, target) {
+  if (!dialog || dialog.contains(document.activeElement)) return; // the focus is still in the window: leave it
+  if (target) {
+    target.focus();
+    return;
+  }
+  const title = dialog.querySelector('.modal-head h2');
+  if (!title) return;
+  title.tabIndex = -1; // a title can take the focus only when told it may
+  title.focus();
+}
+
 // ---------- Phones ----------
 
 // The links as small chips above the rows, always in view. One line each: icon and name (tap for the details),
@@ -528,9 +592,13 @@ export function CompareWindow({ ids, q, owner, instant = false, onClose, onOpenL
   const [expanded, setExpanded] = useState(() => new Set()); // the rows opened with "More"
   const [scrolled, setScrolled] = useState(false); // rows pass under the column names: a soft shadow there
   const [flash, setFlash] = useState(null); // { index }: the column just picked in the quick verdict
+  const [openedAnswer, setOpenedAnswer] = useState(null); // on a phone: the AI answer unfolded with "Why?"
   const scrollRef = useRef(null);
   const tableRef = useRef(null);
   const latest = useRef(null); // the comparison as last loaded, for "recent comparisons"
+  // With "Only show differences" on: the rows shown so far, which stay (see `visible` below).
+  const held = useRef({ key: '', rows: new Set() });
+  const refocus = useRef(null); // the place of a column just taken out, to put the focus on the next one's ×
 
   // This component stays mounted while the window is closed, so each opening starts fresh: rows folded again
   // and no shadow (the scrolling box is new, at the top). Switching between the phone and computer layout swaps
@@ -538,7 +606,10 @@ export function CompareWindow({ ids, q, owner, instant = false, onClose, onOpenL
   const [wasOpen, setWasOpen] = useState(open);
   const [wasPhone, setWasPhone] = useState(phone);
   if (wasOpen !== open || wasPhone !== phone) {
-    if (open && !wasOpen) setExpanded(new Set());
+    if (open && !wasOpen) {
+      setExpanded(new Set());
+      held.current = { key: '', rows: new Set() };
+    }
     setWasOpen(open);
     setWasPhone(phone);
     setScrolled(false);
@@ -555,18 +626,36 @@ export function CompareWindow({ ids, q, owner, instant = false, onClose, onOpenL
   const links = useMemo(() => shownIds.map(id => byId.get(id) ?? null), [byId, key]);
   // (No links at all, before the first comparison, is not "loaded": there's nothing to work out.)
   const loaded = links.length > 0 && links.every(Boolean);
-  const facts = useCompareFacts(key);
+  // The website facts come a moment after the links. Until every link's facts are in (`factsReady`), the quick
+  // verdict keeps a place for their marks and the number of differences waits, so neither changes under your eyes.
+  const { items: facts, ready: factsReady } = useCompareFacts(key);
   const model = useMemo(() => (loaded ? buildModel(links, owner, facts) : null), [links, loaded, owner, facts]);
-  const visible = useMemo(
-    () =>
-      (model?.sections ?? [])
-        .map(section => (onlyDiff ? { ...section, rows: section.rows.filter(row => row.differs), same: [] } : section))
-        .filter(section => section.rows.length || section.same.length),
-    [model, onlyDiff],
-  );
+  // "Only show differences" hides the rows where every link is the same. A row it shows stays until you turn the
+  // switch off or change the links, even when your own change (your status, the star) makes the links the same:
+  // a row that vanished under the mouse would put your next click on another row. A list you click in holds still.
+  const visible = useMemo(() => {
+    const sections = model?.sections ?? [];
+    if (!onlyDiff) return sections.filter(section => section.rows.length || section.same.length);
+    if (held.current.key !== key) held.current = { key, rows: new Set() };
+    const shown = held.current.rows;
+    return sections
+      .map(section => {
+        const rows = section.rows.filter(row => row.differs || shown.has(row.key));
+        for (const row of rows) shown.add(row.key);
+        return { ...section, rows, same: [] };
+      })
+      .filter(section => section.rows.length);
+  }, [model, onlyDiff, key]);
+  const toggleOnlyDiff = () => {
+    held.current = { key: '', rows: new Set() }; // each time the switch goes on, it starts from the rows that differ
+    setOnlyDiff(!onlyDiff);
+  };
 
-  // A link deleted in the meantime: take it out of the comparison (and the tray), and say so.
-  // With fewer than 2 left there's nothing to compare, so the window closes.
+  // A link deleted in the meantime: take it out of the comparison (and your picks), and say so. A link you deleted
+  // yourself goes quietly: you know it's gone. (Also checked when the window opens again: Back into a comparison
+  // whose link you deleted from its details.)
+  // With fewer than 2 left there's nothing to compare, so the window closes the way Back would: one more Back then
+  // goes where you came from, not to this same page without the window.
   useEffect(() => {
     if (!ids.length || !data.data || data.isPlaceholderData) return;
     const gone = ids.filter(id => !byId.has(id));
@@ -574,10 +663,17 @@ export function CompareWindow({ ids, q, owner, instant = false, onClose, onOpenL
     removePicks(gone);
     latest.current = null; // not to be kept in "recent comparisons" with a link that's gone
     const left = ids.filter(id => byId.has(id));
-    onChangeIds(left.length >= MIN_COMPARE ? left : []);
-    toast({ title: gone.length === 1 ? 'A link is gone' : `${gone.length} links are gone`, description: 'It is no longer in your library.', tone: 'info' });
+    if (left.length >= MIN_COMPARE) onChangeIds(left);
+    else onClose();
+    const unexpected = gone.filter(id => !wasDeleted(id)).length;
+    if (!unexpected) return;
+    toast({
+      title: unexpected === 1 ? 'A link is gone' : `${unexpected} links are gone`,
+      description: unexpected === 1 ? 'It is no longer in your library.' : 'They are no longer in your library.',
+      tone: 'info',
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data.data, data.isPlaceholderData]);
+  }, [data.data, data.isPlaceholderData, open]);
 
   // "Recent comparisons" keep each opened comparison once, as it ends (the window closes or the page is left),
   // with the links it ended with. Saving at every change would leave a trail of half-made ones in the list when
@@ -612,8 +708,26 @@ export function CompareWindow({ ids, q, owner, instant = false, onClose, onOpenL
 
   const remove = id => {
     if (shownIds.length <= MIN_COMPARE) return;
+    refocus.current = shownIds.indexOf(id);
     removePicks([id]);
     onChangeIds(shownIds.filter(other => other !== id));
+  };
+  // Once the column is gone, the focus goes to the × of the column that took its place (or the last one), and to
+  // the window's title when that × can't take a link out (only 2 are left).
+  useLayoutEffect(() => {
+    const at = refocus.current;
+    refocus.current = null;
+    if (at === null || !open) return;
+    const dialog = compareDialog();
+    const buttons = [...(dialog?.querySelectorAll('.compare-remove, .compare-chip-remove') ?? [])];
+    const next = buttons[Math.min(at, buttons.length - 1)];
+    moveFocus(dialog, next && next.getAttribute('aria-disabled') !== 'true' ? next : null);
+  }, [key, open]);
+  // Hiding the AI's answer puts the focus on the button that asks it (the title when there is none).
+  const hideAnswer = () => {
+    setAnswer(null);
+    const dialog = compareDialog();
+    requestAnimationFrame(() => moveFocus(dialog, dialog?.querySelector('.compare-ask') ?? null));
   };
   const ready = id => queryClient.prefetchQuery(detailQuery(id, q));
   const toggleRow = rowKey =>
@@ -654,7 +768,19 @@ export function CompareWindow({ ids, q, owner, instant = false, onClose, onOpenL
   };
 
   const verdict = model ? (
-    <CompareVerdict links={links} wins={model.wins} aiPickId={aiPickId} phone={phone} onSelect={showLink} />
+    <CompareVerdict links={links} wins={model.wins} aiPickId={aiPickId} phone={phone} pending={!factsReady} onSelect={showLink} />
+  ) : null;
+  // On a phone the answer starts folded; a new answer is a new object, so it starts folded again by itself.
+  const answerOpen = !phone || (shownAnswer !== null && openedAnswer === shownAnswer);
+  const aiAnswer = shownAnswer ? (
+    <AiAnswer
+      answer={shownAnswer}
+      titleOf={titleOf}
+      phone={phone}
+      open={answerOpen}
+      onToggle={() => setOpenedAnswer(answerOpen ? null : shownAnswer)}
+      onHide={hideAnswer}
+    />
   ) : null;
   const sameMessage = (
     <>
@@ -674,13 +800,18 @@ export function CompareWindow({ ids, q, owner, instant = false, onClose, onOpenL
     >
       <div className="compare-tools">
         <div className="compare-diff">
-          <button type="button" className="compare-switch" role="switch" aria-checked={onlyDiff} onClick={() => setOnlyDiff(!onlyDiff)}>
+          <button type="button" className="compare-switch" role="switch" aria-checked={onlyDiff} onClick={toggleOnlyDiff}>
             <span className="compare-switch-track" aria-hidden="true">
               <span />
             </span>
             Only show differences
           </button>
-          {model ? <span className="compare-diff-count">{differencesText(model.differences)}</span> : null}
+          {/* Its place is kept while the links and their website facts load, so the number shows once, final. */}
+          {model && factsReady ? (
+            <span className="compare-diff-count">{differencesText(model.differences)}</span>
+          ) : data.isError && !data.data ? null : (
+            <span className="compare-diff-count is-loading skeleton" aria-hidden="true" />
+          )}
         </div>
         <CompareActions
           ids={shownIds}
@@ -693,34 +824,8 @@ export function CompareWindow({ ids, q, owner, instant = false, onClose, onOpenL
         />
       </div>
 
-      {shownAnswer ? (
-        <div className="compare-answer" role="status">
-          <span className="compare-answer-icon" aria-hidden="true">
-            <Trophy size={18} />
-          </span>
-          <div>
-            <p className="compare-answer-pick">
-              Best pick: <strong>{titleOf(shownAnswer.pickId)}</strong>
-            </p>
-            {shownAnswer.reason ? <p>{shownAnswer.reason}</p> : null}
-            {shownAnswer.others?.length ? (
-              <ul>
-                {shownAnswer.others.map(other => (
-                  <li key={other.id}>
-                    <strong>{titleOf(other.id)}:</strong> {other.when}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-            <p className="compare-answer-note">
-              <Info size={13} aria-hidden="true" /> Written by the free AI from what your library knows. Check before you decide.
-            </p>
-          </div>
-          <button type="button" className="icon-btn icon-btn-sm" onClick={() => setAnswer(null)} aria-label="Hide the AI's answer" title="Hide">
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>
-      ) : null}
+      {/* On a phone the answer sits at the top of the rows instead (see AiAnswer). */}
+      {phone ? null : aiAnswer}
 
       {data.isError && !data.data ? (
         <div className="compare-error" role="alert">
@@ -742,6 +847,7 @@ export function CompareWindow({ ids, q, owner, instant = false, onClose, onOpenL
             onClose={onClose}
           />
           <div ref={scrollRef} className={`compare-scroll compare-phone${scrolled ? ' is-scrolled' : ''}`} onScroll={onScroll} aria-busy={!loaded}>
+            {aiAnswer}
             {model ? (
               <>
                 {verdict}

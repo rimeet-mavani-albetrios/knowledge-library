@@ -1,0 +1,173 @@
+/* "Lineage" (company-ages.jsx): an old-paper tile for the oldest company, a fresh one for the newest, and the
+   decade bars under them. */
+
+.stats-ages {
+  display: flex;
+  flex-direction: column;
+}
+
+.ages-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.ages-pair.is-single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ages-tile {
+  --tone: var(--warning);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border: 1px solid color-mix(in oklab, var(--tone) 22%, var(--surface));
+  border-radius: var(--radius);
+  background: color-mix(in oklab, var(--tone) 8%, var(--surface));
+  overflow: hidden;
+}
+
+.ages-tile.is-new {
+  --tone: var(--accent);
+}
+
+.ages-main {
+  display: grid;
+  justify-items: start;
+  width: 100%;
+  padding: 12px 14px 10px;
+  border: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .ages-main:hover,
+  .ages-more-row:hover {
+    background: color-mix(in oklab, var(--tone) 14%, var(--surface));
+  }
+}
+
+.ages-label {
+  color: color-mix(in oklab, var(--tone) 70%, var(--text));
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.ages-year {
+  margin-top: 2px;
+  font-family: var(--display);
+  font-size: 34px;
+  font-weight: 750;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ages-name {
+  max-width: 100%;
+  margin-top: 4px;
+  overflow: hidden;
+  font-weight: 650;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.ages-sub {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ages-more {
+  margin: auto 0 0;
+  padding: 4px 0;
+  border-top: 1px dashed color-mix(in oklab, var(--tone) 30%, var(--surface));
+  list-style: none;
+}
+
+.ages-more-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  width: 100%;
+  padding: 5px 14px;
+  border: 0;
+  background: none;
+  color: var(--text-2);
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.ages-more-year {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+
+.ages-more-name {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* ---------- Founded per decade: small columns, the count on top ---------- */
+
+.ages-decades {
+  margin-top: auto;
+  padding-top: 18px;
+}
+
+.ages-bars {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+  height: 104px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ages-bars li {
+  display: grid;
+  grid-template-rows: 16px 1fr 18px;
+  justify-items: center;
+  min-width: 0;
+}
+
+.ages-bar-count {
+  align-self: end;
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.ages-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.ages-bar span {
+  display: block;
+  width: min(80%, 30px);
+  border-radius: 5px 5px 0 0;
+  background: linear-gradient(to top, var(--warning), color-mix(in oklab, var(--warning) 55%, var(--surface)));
+}
+
+.ages-bar-label {
+  align-self: end;
+  color: var(--muted);
+  font-size: 11.5px;
+  white-space: nowrap;
+}

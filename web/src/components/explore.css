@@ -1,0 +1,1196 @@
+/* The Explore page (Explore.jsx): the map on the whole screen, with clean panels floating over it.
+   The map itself is three stacked layers (explore/map-view.js); everything here floats above them.
+   Colors only come from the page's variables, so light and dark both work. The map's own colors (--atlas-sea and so on)
+   are in knowledge-map.css, because the small map on the home page uses them too. */
+
+/* While Explore is open the library behind it can't scroll, so it is just where you left it when you come back. */
+html:has(.explore) {
+  overflow: hidden;
+}
+
+.explore {
+  --explore-panel: var(--surface);
+  --explore-edge: color-mix(in oklab, var(--line-strong) 75%, transparent);
+  --explore-gap: 16px;
+  --explore-shadow: 0 1px 2px rgb(20 24 43 / 0.06), 0 10px 30px -6px rgb(30 42 74 / 0.18);
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  overflow: hidden;
+  background: var(--atlas-sea);
+  color: var(--text);
+  animation: explore-in 0.3s ease-out;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:root[data-theme='dark'] .explore {
+  --explore-shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.5), 0 14px 36px -8px rgb(0 0 0 / 0.65);
+}
+
+.explore:focus {
+  outline: none;
+}
+
+@keyframes explore-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* The map: Sigma fills this box. A soft darker edge makes the sea feel deep and the land sit in the middle. */
+.explore-paper {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 56% 52%, var(--atlas-sea) 52%, color-mix(in oklab, var(--atlas-sea) 90%, var(--text) 10%) 130%);
+  opacity: 0;
+  transition: opacity 0.45s ease-out;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.explore.is-ready .explore-paper {
+  opacity: 1;
+}
+
+/* ---------- The bar at the top ---------- */
+
+.explore-top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 4;
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) minmax(280px, 520px) minmax(0, 1fr);
+  align-items: center;
+  gap: 16px;
+  height: 60px;
+  padding: env(safe-area-inset-top) var(--explore-gap) 0;
+  box-sizing: content-box;
+  background: var(--surface);
+  border-bottom: 1px solid var(--explore-edge);
+}
+
+.explore-top-start {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.explore-back {
+  flex: none;
+  height: 38px;
+  padding: 0 14px 0 10px;
+  border-radius: 999px;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.explore-title {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.explore-title h1 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+}
+
+.explore-title span {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Search ---------- */
+
+.explore-search-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.explore-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 6px 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.explore-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+.explore-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+}
+
+.explore-search input::-webkit-search-cancel-button {
+  display: none; /* our own × instead */
+}
+
+.explore-found {
+  flex: none;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 12.5px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.explore-clear {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+}
+
+@media (hover: hover) {
+  .explore-clear:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+}
+
+/* The best matches, under the box. */
+.explore-matches {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  display: grid;
+  padding: 6px;
+  border: 1px solid var(--explore-edge);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--explore-shadow);
+  animation: explore-pop 0.14s ease-out;
+}
+
+.explore-matches-empty {
+  margin: 0;
+  padding: 10px 10px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.explore-match {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 42px;
+  padding: 5px 10px 5px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+}
+
+.explore-match.is-active {
+  background: var(--surface-2);
+}
+
+.explore-match-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 550;
+}
+
+.explore-match-kind {
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.explore-match-all {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 38px;
+  margin-top: 4px;
+  padding: 0 10px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 10px 10px;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .explore-match-all:hover {
+    background: var(--accent-soft);
+  }
+}
+
+.explore-match-all kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 5px;
+  color: var(--muted);
+  font: 500 11px var(--font);
+}
+
+/* The small round picture used in every list of links on this page. */
+.explore-row-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--hue-soft, var(--surface-2));
+  color: var(--hue-ink, var(--text-2));
+  overflow: hidden;
+}
+
+.explore-row-icon img {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.explore-row-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+/* ---------- The trail: Figma › Penpot › Excalidraw. Earlier links are buttons that jump back. ---------- */
+
+.explore-trail {
+  position: absolute;
+  z-index: 3;
+  top: calc(60px + env(safe-area-inset-top) + 10px);
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: min(640px, calc(100% - 32px));
+  overflow-x: auto;
+  scrollbar-width: none;
+  border: 1px solid var(--explore-edge);
+  border-radius: 999px;
+  background: var(--explore-panel);
+  box-shadow: var(--explore-shadow);
+  animation: explore-trail-in 0.2s ease-out;
+}
+
+.explore-trail::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes explore-trail-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
+}
+
+.explore-trail ol {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  padding: 3px 12px 3px 5px;
+  list-style: none;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.explore-trail li {
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.explore-trail li > span,
+.explore-trail li > button {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 4px 8px;
+  border-radius: 999px;
+}
+
+.explore-trail li > button {
+  border: 0;
+  background: transparent;
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 550;
+}
+
+@media (hover: hover) {
+  .explore-trail li > button:hover {
+    background: var(--accent-soft);
+  }
+}
+
+.explore-trail [aria-current] {
+  color: var(--text);
+  font-weight: 650;
+}
+
+/* ---------- Topics ---------- */
+
+.explore-topics {
+  position: absolute;
+  z-index: 3;
+  left: var(--explore-gap);
+  top: calc(60px + env(safe-area-inset-top) + var(--explore-gap));
+  /* As tall as its list, but it stops above the small map. */
+  max-height: calc(100% - 60px - env(safe-area-inset-top) - var(--explore-gap) * 2 - var(--mini-height, 144px) - 10px);
+  width: 214px;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--explore-edge);
+  border-radius: 16px;
+  background: var(--explore-panel);
+  box-shadow: var(--explore-shadow);
+  overflow: hidden;
+  animation: explore-pop 0.2s ease-out;
+}
+
+.explore-topics header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 8px 5px 14px;
+}
+
+.explore-topics h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.005em;
+}
+
+.explore-topics-fold {
+  width: 30px;
+  height: 30px;
+  color: var(--muted);
+}
+
+.explore-topics ul {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0 6px 14px;
+  list-style: none;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+  /* The list fades out at the bottom, as a hint that there is more below. */
+  -webkit-mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
+  mask-image: linear-gradient(#000 calc(100% - 16px), transparent);
+}
+
+.explore-topic {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  height: 30px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  transition: background-color 0.12s;
+}
+
+@media (hover: hover) {
+  .explore-topic:hover {
+    background: var(--hue-soft);
+  }
+}
+
+.explore-topic:focus-visible {
+  outline-offset: -2px;
+}
+
+.explore-topic[aria-pressed='true'] {
+  background: var(--hue-soft);
+  color: var(--hue-ink);
+  font-weight: 650;
+}
+
+.explore-topic-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explore-swatch {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 4px;
+  background: var(--hue);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--hue) 22%, transparent);
+}
+
+.explore-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* When folded away: just a small button. */
+.explore-topics-open {
+  position: absolute;
+  z-index: 3;
+  left: var(--explore-gap);
+  top: calc(60px + env(safe-area-inset-top) + var(--explore-gap));
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 14px 0 11px;
+  border: 1px solid var(--explore-edge);
+  border-radius: 999px;
+  background: var(--explore-panel);
+  box-shadow: var(--explore-shadow);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+/* On phones: a row of chips you swipe sideways, fading out at both ends. */
+.explore-topics-row {
+  position: absolute;
+  z-index: 3;
+  left: 0;
+  right: 0;
+  top: calc(56px + env(safe-area-inset-top) + 8px);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 22px), transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 14px, #000 calc(100% - 22px), transparent);
+}
+
+.explore-topics-row > div {
+  display: flex;
+  gap: 6px;
+  padding: 2px 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.explore-topics-row > div::-webkit-scrollbar {
+  display: none;
+}
+
+.explore-topic-chip {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--explore-edge);
+  border-radius: 999px;
+  background: var(--explore-panel);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+.explore-topic-chip[aria-pressed='true'] {
+  border-color: var(--hue);
+  background: var(--hue-soft);
+  color: var(--hue-ink);
+}
+
+/* ---------- The small map, the zoom buttons, the hint ---------- */
+
+.explore-mini {
+  position: absolute;
+  z-index: 3;
+  left: var(--explore-gap);
+  bottom: var(--explore-gap);
+  width: 214px;
+  border: 1px solid var(--explore-edge);
+  border-radius: 14px;
+  background: var(--atlas-sea);
+  box-shadow: var(--explore-shadow);
+  overflow: hidden;
+}
+
+.explore-mini canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.explore-zoom {
+  position: absolute;
+  z-index: 3;
+  right: var(--explore-gap);
+  bottom: var(--explore-gap);
+  bottom: max(var(--explore-gap), env(safe-area-inset-bottom));
+  display: flex;
+  border: 1px solid var(--explore-edge);
+  border-radius: 14px;
+  background: var(--explore-panel);
+  box-shadow: var(--explore-shadow);
+  overflow: hidden;
+}
+
+.explore-zoom-btn {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 42px;
+  border: 0;
+  background: transparent;
+  color: var(--text-2);
+}
+
+.explore-zoom-btn + .explore-zoom-btn {
+  border-left: 1px solid var(--line);
+}
+
+@media (hover: hover) {
+  .explore-zoom-btn:hover {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+}
+
+.explore-zoom-btn:focus-visible {
+  outline-offset: -3px;
+}
+
+.explore-hint {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: max(20px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 8px 16px;
+  border: 1px solid var(--explore-edge);
+  border-radius: 999px;
+  background: var(--explore-panel);
+  box-shadow: var(--explore-shadow);
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  animation: explore-hint-in 0.35s 0.7s ease-out both;
+  transition: opacity 0.35s, transform 0.35s;
+}
+
+.explore-hint.is-leaving {
+  opacity: 0;
+  transform: translate(-50%, 6px);
+}
+
+@keyframes explore-hint-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 6px);
+  }
+}
+
+/* The card under the mouse. Moved by the map itself (no React drawing on every move). */
+.explore-tip {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: max-content;
+  max-width: 280px;
+  padding: 6px 12px 6px 7px;
+  border: 1px solid var(--explore-edge);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: var(--explore-shadow);
+  pointer-events: none;
+}
+
+.explore-tip[hidden] {
+  display: none;
+}
+
+.explore-tip-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.explore-tip-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+  font-weight: 650;
+}
+
+.explore-tip-text > span {
+  color: var(--hue-ink);
+  font-size: 12px;
+  font-weight: 550;
+}
+
+/* ---------- The card about what's picked ---------- */
+
+.explore-card {
+  position: absolute;
+  z-index: 3;
+  right: var(--explore-gap);
+  top: calc(60px + env(safe-area-inset-top) + var(--explore-gap));
+  /* It stops above the zoom buttons, so they are never under it. */
+  max-height: calc(100% - 60px - env(safe-area-inset-top) - var(--explore-gap) - var(--explore-gap) - 44px - 12px - var(--explore-gap));
+  width: 372px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+  padding: 16px 16px 12px;
+  border: 1px solid var(--explore-edge);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: var(--explore-shadow);
+  animation: explore-card-in 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes explore-card-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+
+@keyframes explore-pop {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+.explore-card-grip {
+  display: none;
+}
+
+.explore-card-head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.explore-card-icon,
+.explore-island-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--hue-soft);
+  color: var(--hue-ink);
+  overflow: hidden;
+}
+
+.explore-card-icon img {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  object-fit: contain;
+}
+
+.explore-card-name {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+  padding-top: 1px;
+}
+
+.explore-card-name h2 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.explore-card-name a,
+.explore-island-count {
+  justify-self: start;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 13.5px;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .explore-card-name a:hover {
+    color: var(--accent-text);
+    text-decoration: underline;
+  }
+}
+
+.explore-card-close {
+  margin: -6px -6px 0 0;
+}
+
+.explore-card-badge {
+  display: flex;
+  margin-top: -2px;
+}
+
+.explore-card-summary {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  color: var(--text-2);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.explore-card-summary:not(:has(.explore-skeleton)) {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.explore-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.explore-card-actions .btn {
+  height: 38px;
+  padding: 0 10px;
+  gap: 5px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.explore-card-actions .btn-primary {
+  flex: 1 0 auto;
+}
+
+.explore-card-actions .btn.is-waiting {
+  opacity: 0.55;
+}
+
+.explore-compare.is-on {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: var(--accent-soft);
+}
+
+.explore-compare[aria-disabled='true'] {
+  opacity: 0.55;
+}
+
+.explore-skeleton {
+  display: block;
+  width: 100%;
+  height: 11px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2), var(--line), var(--surface-2));
+  background-size: 200% 100%;
+  animation: explore-shimmer 1.2s linear infinite;
+}
+
+@keyframes explore-shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* An island's top tags. */
+.explore-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.explore-tags li {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--hue-soft);
+  color: var(--hue-ink);
+  font-size: 12.5px;
+  font-weight: 550;
+}
+
+/* Closest links, or an island's top links: a row each. */
+.explore-near {
+  display: grid;
+  gap: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.explore-near h3 {
+  margin: 0 0 2px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.explore-near ol {
+  display: grid;
+  margin: 0 -8px;
+  padding: 0;
+  list-style: none;
+}
+
+.explore-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .explore-row:hover {
+    background: var(--surface-2);
+  }
+}
+
+.explore-row-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.explore-near-bar {
+  display: block;
+  width: 44px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.explore-near-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--hue, var(--accent));
+}
+
+/* ---------- Loading, error, empty ---------- */
+
+.explore-state {
+  position: absolute;
+  inset: 60px 0 0;
+  z-index: 1;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+  padding: 24px;
+  color: var(--muted);
+  font-size: 15px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.explore-state p {
+  margin: 0;
+}
+
+.explore-state.is-solid {
+  color: var(--text);
+}
+
+.explore-state-small {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.explore-state .btn {
+  pointer-events: auto;
+}
+
+/* A soft land shape that breathes while the map is on its way. */
+.explore-loading {
+  width: 240px;
+  height: 162px;
+  fill: var(--atlas-land);
+  stroke: var(--atlas-coast);
+  stroke-width: 0.6;
+  animation: explore-breathe 1.6s ease-in-out infinite;
+}
+
+@keyframes explore-breathe {
+  50% {
+    opacity: 0.45;
+    transform: scale(0.985);
+  }
+}
+
+/* Hidden elements in each category's color, for the canvas to read colors from. */
+.explore-probes {
+  display: none;
+}
+
+/* ---------- Middle-size screens: less room, so less on screen at once ---------- */
+
+@media (max-width: 1000px) {
+  .explore-title span {
+    display: none;
+  }
+
+  .explore-top {
+    grid-template-columns: auto minmax(0, 1fr) 0;
+  }
+}
+
+@media (max-width: 800px) and (min-width: 641px) {
+  .explore-title {
+    display: none;
+  }
+}
+
+/* Topics and the card don't both fit: while a card is open, the Topics list makes way for the map. */
+@media (max-width: 1100px) and (min-width: 641px) {
+  .explore.has-card .explore-topics,
+  .explore.has-card .explore-topics-open,
+  .explore.has-card .explore-mini {
+    display: none;
+  }
+}
+
+/* Low or narrow screens (a phone on its side, a small window): no small map, and the Topics list uses its room. */
+@media (max-height: 640px) and (min-width: 641px), (max-width: 900px) and (min-width: 641px) {
+  .explore-mini {
+    display: none;
+  }
+
+  .explore-topics {
+    max-height: calc(100% - 60px - env(safe-area-inset-top) - var(--explore-gap) * 2);
+  }
+}
+
+/* ---------- Phones: the panels make room, and the card is a sheet at the bottom ---------- */
+
+@media (max-width: 640px) {
+  .explore {
+    --explore-gap: 12px;
+  }
+
+  .explore-top {
+    height: 56px;
+    padding-inline: 10px;
+    gap: 8px;
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  .explore-top-end,
+  .explore-title {
+    display: none;
+  }
+
+  .explore-back {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .explore-back span {
+    display: none;
+  }
+
+  .explore-trail {
+    top: calc(56px + env(safe-area-inset-top) + 50px);
+    max-width: calc(100% - 20px);
+  }
+
+  .explore-trail li > span,
+  .explore-trail li > button {
+    max-width: 130px;
+  }
+
+  .explore-zoom {
+    flex-direction: column;
+  }
+
+  .explore-zoom-btn + .explore-zoom-btn {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+  }
+
+  .explore-zoom-btn {
+    width: 42px;
+  }
+
+  .explore-card,
+  .explore-card.is-island {
+    left: 0;
+    right: 0;
+    bottom: 0;
+    top: auto;
+    width: auto;
+    height: 44dvh;
+    max-height: none;
+    padding: 0 16px max(14px, env(safe-area-inset-bottom));
+    border-radius: 20px 20px 0 0;
+    border-width: 1px 0 0;
+    animation-name: explore-sheet-in;
+    transition: height 0.28s cubic-bezier(0.2, 0.8, 0.2, 1), transform 0.2s ease-out;
+  }
+
+  .explore-card.is-tall {
+    height: 76dvh;
+  }
+
+  /* The handle: a wide strip so a thumb finds it easily. It stays at the top while the rest scrolls. */
+  .explore-card-grip {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    height: 22px;
+    margin: 0 -16px -6px;
+    background: var(--surface);
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .explore-card-grip span {
+    width: 38px;
+    height: 4px;
+    border-radius: 999px;
+    background: var(--line-strong);
+  }
+
+  .explore.has-card .explore-zoom,
+  .explore.has-card .explore-hint {
+    display: none;
+  }
+
+  .explore-hint {
+    left: 12px;
+    right: 66px;
+    max-width: none;
+    bottom: max(14px, env(safe-area-inset-bottom));
+    transform: none;
+    white-space: normal;
+    border-radius: 14px;
+    font-size: 13px;
+    animation-name: explore-pop;
+  }
+
+  .explore-hint.is-leaving {
+    transform: translateY(6px);
+  }
+
+  .explore-matches {
+    position: fixed;
+    top: calc(56px + env(safe-area-inset-top) + 2px);
+    left: 8px;
+    right: 8px;
+    z-index: 5;
+  }
+}
+
+@keyframes explore-sheet-in {
+  from {
+    transform: translateY(40px);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .explore,
+  .explore-card,
+  .explore-trail,
+  .explore-hint,
+  .explore-skeleton,
+  .explore-loading,
+  .explore-topics,
+  .explore-matches {
+    animation: none;
+  }
+
+  .explore-paper {
+    transition: none;
+  }
+}

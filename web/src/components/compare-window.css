@@ -96,6 +96,15 @@
   white-space: nowrap;
 }
 
+/* Its place while the links and their website facts load: the number shows once, when it's final. */
+.compare-diff-count.is-loading {
+  display: inline-block;
+  width: 96px;
+  height: 22px;
+  background: linear-gradient(90deg, var(--surface-2) 0%, var(--line) 50%, var(--surface-2) 100%);
+  background-size: 200% 100%;
+}
+
 .compare-ask {
   gap: 7px;
   height: 36px;
@@ -155,6 +164,27 @@
   margin-top: 8px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.compare-answer-body {
+  min-width: 0;
+}
+
+/* "Best pick: …" and, on a phone, "Why?" at the end of the same line */
+.compare-answer-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 10px;
+}
+
+.compare-answer-line .compare-answer-pick {
+  min-width: 0;
+}
+
+.compare-answer-why {
+  flex: none;
+  margin-top: 0;
 }
 
 /* ---------- The table ---------- */
@@ -515,9 +545,33 @@ td.is-flash {
     margin-bottom: 10px;
   }
 
+  /* The AI's answer sits at the top of the rows and scrolls away with them (CompareWindow.jsx), so the rows keep
+     at least half of a small screen. Folded, it's one slim line: "Best pick: …" and "Why?". */
   .compare-answer {
-    max-height: 32dvh;
-    overflow: auto;
+    gap: 10px;
+    padding: 10px 8px 10px 12px;
+  }
+
+  .compare-answer.is-folded {
+    align-items: center;
+    padding-block: 6px;
+  }
+
+  .compare-answer-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 9px;
+  }
+
+  .compare-answer.is-folded .compare-answer-line {
+    align-items: center;
+  }
+
+  .compare-answer.is-folded .compare-answer-pick {
+    margin: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 

@@ -1,5 +1,6 @@
 /* The compact view (tiles, like files in a folder), the icon-only Open arrow, and the date on list rows.
-   Cards and rows themselves are styled in styles.css. */
+   Cards and rows themselves are styled in styles.css.
+   At the end: small fixes for the home page around them (the search examples, the toolbar and category sheet on phones). */
 
 /* ---------- Compact view: about eight tiles per line on a big screen ---------- */
 
@@ -169,7 +170,7 @@
 .tile-fav {
   display: inline-grid;
   place-items: center;
-  color: #e8a200;
+  color: var(--star);
 }
 
 .tile-fav svg {
@@ -303,6 +304,20 @@
   color: var(--muted);
 }
 
+/* ---------- Grey hints inside empty boxes, in the whole app: the browser's own grey is too faint on a dark window ---------- */
+
+::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+/* ---------- Dark: the light square behind a website's icon waits for the icon ---------- */
+
+/* While an icon loads (or when it never comes) a bright empty square would flash on the dark page. */
+:root[data-theme='dark'] :is(.row-icon, .tile-icon) > img:not(.is-loaded) {
+  background: transparent;
+}
+
 /* ---------- Mouse only: a lift on hover, and the Open arrow only when the tile is pointed at ---------- */
 
 @media (hover: hover) {
@@ -310,6 +325,13 @@
     border-color: color-mix(in oklab, var(--hue) 45%, var(--line));
     box-shadow: 0 10px 24px -14px color-mix(in oklab, var(--hue) 70%, transparent);
     transform: translateY(-1px);
+  }
+
+  /* Dark: no colored glow (it looks noisy on a dark page), a plain deep shadow instead. A ticked tile keeps its
+     accent border. */
+  :root[data-theme='dark'] .tile:not(.is-selected):hover {
+    border-color: color-mix(in oklab, var(--hue) 35%, var(--line-strong));
+    box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.8);
   }
 
   .tile .btn-open-icon {
@@ -375,5 +397,142 @@
     right: 6px;
     width: 28px;
     height: 28px;
+  }
+}
+
+/* ---------- Filters: the chips of the filters that are on ---------- */
+
+/* All of them thin and tinted, like the tag's chip. (In styles.css .chip comes after .chip-active and undid it.) */
+.active-filters .chip-active {
+  height: 30px;
+  padding: 0 8px 0 11px;
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent-text);
+  font-size: 13.5px;
+}
+
+/* A thin edge, so the pale tint still reads as a chip on the folder in the light theme. */
+.active-filters .chip-active,
+.active-filters .chip-active-tag {
+  border-color: color-mix(in oklab, var(--accent) 22%, transparent);
+}
+
+/* A very long collection or tag name stays inside its box. */
+.active-filters .chip,
+.fp-chip {
+  max-width: 100%;
+}
+
+.chip-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.active-filters .chip svg,
+.fp-chip .chip-count {
+  flex: none;
+}
+
+/* ---------- Sort and the "N more" window stay inside the window (--fp-room: useRoomBelow in Popover.jsx) ---------- */
+
+@media (min-width: 641px) {
+  .toolbar-tools .menu-pop {
+    max-height: var(--fp-room, none);
+    overflow-y: auto;
+  }
+
+  .cat-picker .cat-pop-inner {
+    max-height: min(calc(var(--fp-room, 70vh) - 16px), 560px);
+  }
+}
+
+/* ---------- The search examples: whole words or nothing ---------- */
+
+/* On a computer you can't swipe them sideways, so an example that doesn't fit wraps onto a second line, which is
+   hidden: it's either whole or left out, never cut in half. (Phones keep the row you swipe, with its fade.) */
+@media (min-width: 641px) {
+  .search .examples {
+    flex-wrap: wrap;
+    height: 30px;
+    overflow: hidden;
+    mask-image: none;
+  }
+}
+
+@media (max-width: 640px) {
+  /* ---------- Phones: six toolbar buttons share one line ---------- */
+
+  /* Filters keeps its whole word (with filters on, the icon and the number say enough), Sort gets what's left and
+     gives up its small arrow, so its word isn't cut short either. Without Sort (in a search) Filters takes the room. */
+  .toolbar .toolbar-tools {
+    gap: 4px;
+  }
+
+  .toolbar .toolbar-tools > .filters-drop:has(+ .dropdown) {
+    flex: none;
+  }
+
+  .toolbar-tools > .filters-drop:has(+ .dropdown).is-split .tool-label {
+    display: none;
+  }
+
+  .toolbar .toolbar-tools > .dropdown > .tool-btn {
+    padding: 0 9px;
+  }
+
+  .toolbar-tools > .filters-drop:has(+ .dropdown).is-split > .tool-btn:first-child {
+    padding: 0 7px;
+  }
+
+  .toolbar-tools > .filters-drop:has(+ .dropdown) > .filters-clear {
+    width: 34px;
+  }
+
+  .toolbar .toolbar-tools > .dropdown:not(.filters-drop) > .tool-btn {
+    padding: 0 6px;
+  }
+
+  .toolbar-tools .dropdown:not(.filters-drop) .tool-chevron {
+    display: none;
+  }
+
+  /* ---------- Phones: list rows, the line under the summary ---------- */
+
+  /* A price that doesn't fit wraps onto a second line, which is hidden: it's either whole or left out, never cut in
+     half. The tags take what's left and fade out at the end, if at least a bit of them fits. */
+  .row-meta {
+    flex-wrap: wrap;
+    align-content: flex-start;
+    height: 20px;
+  }
+
+  .row-meta .badge {
+    max-width: 100%;
+  }
+
+  .row-meta .row-tags {
+    flex: 1 1 0;
+    min-width: 64px;
+  }
+
+  /* ---------- Phones: the "N more" sheet, two columns ---------- */
+
+  /* A long name takes a second line instead of being cut. */
+  .cat-grid .cat-item {
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .cat-grid .cat-item-icon {
+    width: 28px;
+    height: 28px;
+  }
+
+  .cat-grid .cat-item-name {
+    white-space: normal;
+    line-height: 1.2;
   }
 }

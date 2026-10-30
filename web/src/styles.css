@@ -12,7 +12,7 @@
   --line-strong: #cdd2de;
   --text: #14182b;
   --text-2: #444b62;
-  --muted: #6b7287;
+  --muted: #646b7f; /* a touch darker than before, so small grey words pass the contrast check on the folder too */
   --accent: #4b3ff0;
   --accent-hover: #3a2fd6;
   --on-accent: #ffffff;
@@ -21,8 +21,9 @@
   --grid-dot: rgb(20 24 43 / 0.09);
   --danger: #c4372f;
   --danger-soft: #fdecea;
-  --success: #1c7c54;
-  --warning: #9a5b00;
+  --success: #17714c; /* (success and warning: a touch darker, so they stay readable on their own soft tints) */
+  --warning: #8c5200;
+  --star: #e8a200; /* a favorite's star */
   --shadow: 0 1px 2px rgb(20 24 43 / 0.05), 0 8px 24px rgb(20 24 43 / 0.08);
   --backdrop: rgb(15 18 32 / 0.5);
 
@@ -33,28 +34,54 @@
   color-scheme: light;
 }
 
+/* Dark theme, "Graphite": a calm near-black with only a hint of cool tint (not navy), so the layers are told apart
+   by how light they are. Each layer is one even step lighter than the one under it:
+   page (--bg) < folder (--folder, further down) < cards (--surface) < hover and wells (--surface-2) < pressed (--surface-3).
+   Windows, menus and other things that float get their own, slightly lighter set (see "Raised" just below).
+   Text is off-white rather than pure white, which is easier on the eyes on a dark page. */
 :root[data-theme='dark'] {
-  --bg: #0f1220;
-  --surface: #171b2e;
-  --surface-2: #1f2439;
-  --line: #272c44;
-  --line-strong: #3a4060;
-  --text: #e8eaf4;
-  --text-2: #bdc2d6;
-  --muted: #9097b0;
-  --accent: #a9a2ff;
-  --accent-hover: #c4bfff;
-  --on-accent: #14182b;
-  --accent-soft: #262b55;
-  --accent-text: #bdb7ff;
-  --grid-dot: rgb(232 234 244 / 0.07);
-  --danger: #ff8a80;
-  --danger-soft: #3d1d22;
-  --success: #5dd4a0;
-  --warning: #f2c14e;
-  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 10px 28px rgb(0 0 0 / 0.35);
-  --backdrop: rgb(4 6 14 / 0.7);
+  --bg: #0d0e11;
+  --surface: #191b1f;
+  --surface-2: #22242a;
+  --surface-3: #2b2e34; /* a pressed button in a row of choices: lighter than its --surface-2 track */
+  --line: #292b31;
+  --line-strong: #3a3d44;
+  --text: #e7e9ee;
+  --text-2: #babec6;
+  --muted: #8f949d;
+  /* The brand lavender, a little deeper than before: a solid button with white words pops without glowing. */
+  --accent: #6458ee;
+  --accent-hover: #6b60f1;
+  --on-accent: #ffffff;
+  --accent-soft: #2a294b;
+  --accent-text: #aea7ff; /* links and tags: the light lavender reads well on every dark layer */
+  --grid-dot: rgb(255 255 255 / 0.035); /* the page's dots: quieter than before */
+  --danger: #f0796f;
+  --danger-soft: #3c1f1f;
+  --success: #5cc394;
+  --warning: #e3b45a;
+  --star: #f2b84b;
+  --icon-plate: #dadde3; /* the light square behind a website's own icon, so a black logo still shows */
+  /* Shadows are deeper but soft, with a faint light edge on top that makes floating things look lifted. */
+  --shadow: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 1px 2px rgb(0 0 0 / 0.5), 0 12px 32px -8px rgb(0 0 0 / 0.6);
+  --backdrop: rgb(4 5 7 / 0.66);
   color-scheme: dark;
+}
+
+/* Raised: windows, menus, panels, the hover peek, toasts and the selection bar float above the page, so in the dark
+   theme they use a lighter set of the same colors. Everything inside them that uses --surface, --line and so on
+   follows along, so a box inside a window still looks the same as a box on the page does in the light theme. */
+:root[data-theme='dark'] :is(dialog, .popover, .menu, .suggest, .peek, .toasts, .bulk-bar) {
+  --surface: #1d2025;
+  --surface-2: #272a2f;
+  --surface-3: #30333a;
+  --line: #2d3037;
+  --line-strong: #3f424a;
+  --accent-soft: #2f2e51;
+}
+
+:root[data-theme='dark'] ::selection {
+  background: rgb(100 88 238 / 0.45);
 }
 
 /* Territory colors: an element with style="--hue: …" gets a soft background and a readable text color
@@ -62,6 +89,19 @@
 [style*='--hue'] {
   --hue-soft: color-mix(in oklab, var(--hue) 16%, var(--surface));
   --hue-ink: color-mix(in oklab, var(--hue) 58%, var(--text));
+}
+
+/* Dark theme: hueOf() (categories.jsx) also sets --hue-dark, the category's dark-friendly color, and here it takes
+   the place of --hue. It needs !important because the light color is set right on the element (style="…"), and only
+   an important rule can win over that. Everything made from --hue (soft backgrounds, words, map dots, and code that
+   reads --hue with getComputedStyle) then gets the dark color. The words take more of the color than in the light
+   theme: the dark colors are bright enough to stay easy to read (every badge is at least 5.9:1). */
+:root[data-theme='dark'] [style*='--hue-dark'] {
+  --hue: var(--hue-dark) !important;
+}
+
+:root[data-theme='dark'] [style*='--hue'] {
+  --hue-ink: color-mix(in oklab, var(--hue) 72%, var(--text));
 }
 
 /* ---------- Base ---------- */
@@ -74,6 +114,128 @@
 
 html {
   -webkit-text-size-adjust: 100%;
+}
+
+/* ---------- Scrollbars ---------- */
+
+/* One thin, rounded scrollbar for the whole app, in both themes: a soft pill on no track, with no arrows. The colors are
+   the text color made see-through, so they sit calmly on every surface. Inside windows, panels and lists the pill is
+   quiet and gets clearer while you point at that area; the page's own stays visible but subtle.
+   Touch screens keep their own: it floats over the content and hides by itself, which is already what you want there.
+
+   Careful: Chrome ignores all of the ::-webkit-scrollbar rules on any element whose scrollbar-width or scrollbar-color
+   isn't `auto`. So those two appear only in the Firefox block at the end of this section. (`scrollbar-width: none`, to
+   hide a bar on purpose, is fine everywhere.) */
+@property --pointed-at {
+  syntax: '<number>';
+  inherits: false; /* it stays on the element itself, so pointing at something doesn't redo everything inside it */
+  initial-value: 0;
+}
+
+:root {
+  --scroll-quiet: color-mix(in oklab, var(--text) 14%, transparent);
+  --scroll-clear: color-mix(in oklab, var(--text) 26%, transparent);
+  --scroll-strong: color-mix(in oklab, var(--text) 42%, transparent);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* 10px is the part you can grab; the transparent border leaves a 4px pill in the middle of it. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* The pill stops short of the ends, so it never runs into a window's round corners. */
+  ::-webkit-scrollbar-track {
+    margin: 6px;
+  }
+
+  ::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    min-width: 36px;
+    min-height: 36px;
+    border: 3px solid transparent;
+    border-radius: 999px;
+    background-color: var(--scroll-quiet);
+    background-clip: padding-box;
+  }
+
+  /* You're pointing at the area it scrolls. (Chrome only redraws a scrollbar when something about its element changes,
+     and pointing at it alone isn't enough. --pointed-at, see above, is that change: it is otherwise unused.) */
+  :hover {
+    --pointed-at: 1;
+  }
+
+  :hover::-webkit-scrollbar-thumb {
+    background-color: var(--scroll-clear);
+  }
+
+  /* The page's own scrollbar. */
+  html::-webkit-scrollbar-thumb,
+  body::-webkit-scrollbar-thumb {
+    background-color: var(--scroll-clear);
+  }
+
+  /* You're pointing at the pill itself, or dragging it: a little wider and darker. */
+  ::-webkit-scrollbar-thumb:hover {
+    border-width: 2px;
+    background-color: var(--scroll-strong);
+  }
+
+  ::-webkit-scrollbar-thumb:active {
+    border-width: 2px;
+    background-color: color-mix(in oklab, var(--text) 55%, transparent);
+  }
+
+  /* The page always keeps the scrollbar's lane, so it doesn't move sideways between a short page and a long one. */
+  html {
+    scrollbar-gutter: stable;
+  }
+
+  /* While a window is open the page behind it stays still and its scrollbar goes away: the dark background then covers
+     the whole screen, with no bright stripe left at the right edge. The body takes over the lane's 10px, so nothing
+     behind the window moves. */
+  @supports selector(::-webkit-scrollbar) and (scrollbar-gutter: stable) {
+    html:has(dialog:modal) {
+      overflow: hidden;
+      scrollbar-gutter: auto;
+    }
+
+    html:has(dialog:modal) body {
+      padding-right: 10px;
+    }
+
+    /* (Set to `thin` in stats/activity.css, which would make Chrome ignore the rules above.) */
+    div.cal-scroll {
+      scrollbar-width: auto;
+    }
+  }
+}
+
+/* Firefox has no ::-webkit-scrollbar: it gets the same calm colors the standard way, and picks its own thin bar. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scroll-quiet) transparent;
+  }
+
+  *:hover {
+    scrollbar-color: var(--scroll-clear) transparent;
+  }
+
+  html {
+    scrollbar-color: var(--scroll-clear) transparent;
+  }
 }
 
 body {
@@ -116,6 +278,11 @@ h3 {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Dark: the keyboard ring uses the light lavender, which shows clearly on every dark layer (windows included). */
+:root[data-theme='dark'] :focus-visible {
+  outline-color: var(--accent-text);
 }
 
 .sr-only {
@@ -302,6 +469,12 @@ textarea.input {
   background: var(--surface);
   color: var(--text);
   box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+
+/* Dark: the pressed choice must be lighter than its track (lighter means "on top" in the dark), not darker. */
+:root[data-theme='dark'] .segmented button[aria-pressed='true'] {
+  background: var(--surface-3);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4);
 }
 
 .segmented-text button {
@@ -621,8 +794,9 @@ kbd {
   opacity: 0.15;
 }
 
+/* (Dark: the category colors are brighter there, so the halos need less strength to show, and stay calm.) */
 [data-theme='dark'] .map-territory .map-halo {
-  opacity: 0.24;
+  opacity: 0.18;
 }
 
 .map svg.is-pointing {
@@ -643,7 +817,7 @@ kbd {
 }
 
 [data-theme='dark'] .map-halo {
-  opacity: 0.2;
+  opacity: 0.14;
 }
 
 /* A search or filter dims every dot with this one change; the matching ones are drawn again on top (.map-lit). */
@@ -717,6 +891,18 @@ kbd {
   font-weight: 600;
   color: color-mix(in oklab, var(--hue) 55%, var(--bg));
   margin-bottom: 2px;
+}
+
+/* Dark: a white label would glare on a dark map, so it's a lighter grey box with a faint edge (like the tooltips),
+   and the category name keeps its own bright color. */
+:root[data-theme='dark'] .map-tip {
+  background: #35383e;
+  color: var(--text);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06), 0 8px 24px rgb(0 0 0 / 0.5);
+}
+
+:root[data-theme='dark'] .map-tip span {
+  color: var(--hue);
 }
 
 .map-empty {
@@ -950,6 +1136,10 @@ kbd {
   mask-image: linear-gradient(to right, #000 calc(100% - 40px), transparent);
 }
 
+.examples::-webkit-scrollbar {
+  display: none;
+}
+
 .examples button {
   flex: none;
   border: 1px dashed var(--line-strong);
@@ -1103,7 +1293,7 @@ kbd {
 }
 
 :root[data-theme='dark'] {
-  --folder: #13172a; /* between the page and the cards, so the cards are still the lightest thing */
+  --folder: #121417; /* one step lighter than the page and one darker than the cards, so the cards still stand out */
 }
 
 .browse {
@@ -1834,6 +2024,13 @@ kbd {
     box-shadow: 0 18px 40px -20px color-mix(in oklab, var(--hue) 70%, transparent);
     transform: translateY(-3px);
   }
+
+  /* Dark: a colored glow looks noisy on a dark page, so the card gets a plain deep shadow and a hint of its color
+     in the border. (A ticked card keeps its accent border.) */
+  :root[data-theme='dark'] .card:not(.is-selected):hover {
+    border-color: color-mix(in oklab, var(--hue) 35%, var(--line-strong));
+    box-shadow: 0 16px 36px -18px rgb(0 0 0 / 0.85);
+  }
 }
 
 .card:has(.card-open:focus-visible) {
@@ -1956,6 +2153,39 @@ kbd {
   color: var(--text);
   font-size: 13.5px;
   font-weight: 600;
+}
+
+/* Dark: a category color mixed into a dark surface turns muddy, so the picture's frame and the empty picture box
+   are a calm neutral grey with only a faint touch of the category. The category shows in the small dots and in
+   the icon, which keeps its full color so it is easy to see. */
+:root[data-theme='dark'] .preview {
+  background-color: color-mix(in oklab, var(--hue, var(--surface-2)) 6%, var(--surface-2));
+}
+
+:root[data-theme='dark'] .preview-band {
+  color: var(--hue);
+  background-image: radial-gradient(color-mix(in oklab, var(--hue) 18%, transparent) 1px, transparent 1.4px);
+}
+
+/* The website's own icon sits on a soft light square, like an app icon: many logos are black and would vanish
+   on a dark square. (The GitHub mark is drawn in the text color, so it turns dark here too.) */
+:root[data-theme='dark'] .preview-tile {
+  background: var(--icon-plate);
+  color: #191b1f;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.5), 0 6px 16px -6px rgb(0 0 0 / 0.6);
+}
+
+:root[data-theme='dark'] .preview-status {
+  background: var(--surface-3);
+}
+
+/* Dark, the small icon squares (list rows, tiles, the search panel, similar links): the website's icon gets a
+   small light plate of its own, and the square around it keeps its category color. */
+:root[data-theme='dark'] :is(.row-icon, .tile-icon) > img {
+  box-sizing: content-box;
+  padding: 3px;
+  border-radius: 6px;
+  background: var(--icon-plate);
 }
 
 .card-body {
@@ -2183,6 +2413,12 @@ kbd {
   .row:hover {
     border-color: color-mix(in oklab, var(--hue) 45%, var(--line));
     box-shadow: 0 10px 28px -20px color-mix(in oklab, var(--hue) 70%, transparent);
+  }
+
+  /* Dark: no colored glow (see .card). */
+  :root[data-theme='dark'] .row:not(.is-selected):hover {
+    border-color: color-mix(in oklab, var(--hue) 35%, var(--line-strong));
+    box-shadow: 0 10px 24px -16px rgb(0 0 0 / 0.8);
   }
 }
 
@@ -3109,6 +3345,11 @@ mark {
   padding: 0 2px;
 }
 
+/* Dark: a stronger tint, or the found words hardly stand out from the dark card. */
+:root[data-theme='dark'] mark {
+  background: color-mix(in oklab, var(--accent) 34%, transparent);
+}
+
 .spelling {
   margin: -6px 0 14px;
   color: var(--text-2);
@@ -3183,7 +3424,7 @@ mark {
 }
 
 .star-btn.is-on {
-  color: #e8a200;
+  color: var(--star);
 }
 
 .star-btn.is-on svg {

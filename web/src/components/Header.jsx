@@ -1,6 +1,6 @@
 // Top bar: library name, theme switch, the owner's buttons, and a small search box once you scroll down.
 import { useEffect, useRef, useState } from 'react';
-import { Plus, Sun, Moon, Monitor, LogIn, LogOut, Download, Ellipsis, BookmarkPlus, ChartColumn } from 'lucide-react';
+import { Plus, Sun, Moon, Monitor, LogIn, LogOut, Download, Ellipsis, BookmarkPlus, ChartColumn, CopyCheck } from 'lucide-react';
 import { LogoMark } from './Icons.jsx';
 import EmailMenu from './EmailMenu.jsx';
 import { useTheme } from '../hooks.js';
@@ -40,13 +40,18 @@ function ThemeSwitch() {
   );
 }
 
-function OwnerMenu({ canLogOut, onLogout, onSaveButton }) {
+function OwnerMenu({ canLogOut, onLogout, onSaveButton, onDuplicates }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   useEffect(() => {
     if (!open) return;
     const close = event => !ref.current?.contains(event.target) && setOpen(false);
-    const onKey = event => event.key === 'Escape' && setOpen(false);
+    // Esc puts the focus back on the ⋯ button, the first button in here.
+    const onKey = event => {
+      if (event.key !== 'Escape') return;
+      setOpen(false);
+      ref.current?.querySelector('button')?.focus();
+    };
     document.addEventListener('pointerdown', close);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -57,7 +62,7 @@ function OwnerMenu({ canLogOut, onLogout, onSaveButton }) {
 
   return (
     <div className="menu-wrap" ref={ref}>
-      <button type="button" className="icon-btn" aria-label="More options" aria-expanded={open} onClick={() => setOpen(!open)}>
+      <button type="button" className="icon-btn" aria-label="More options" title="More options" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(!open)}>
         <Ellipsis size={20} />
       </button>
       {open && (
@@ -71,6 +76,17 @@ function OwnerMenu({ canLogOut, onLogout, onSaveButton }) {
             }}
           >
             <BookmarkPlus size={16} aria-hidden="true" /> Save button for your browser
+          </button>
+          {/* Links you may have saved twice (Duplicates.jsx) */}
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              onDuplicates();
+            }}
+          >
+            <CopyCheck size={16} aria-hidden="true" /> Find duplicates
           </button>
           <p className="menu-label">Download a backup</p>
           <a role="menuitem" href="/api/export?format=json" onClick={() => setOpen(false)}>
@@ -122,7 +138,7 @@ function StatsButton({ open, onClick, onReady }) {
 }
 
 // `search` is the small search box, shown once the big one has scrolled out of sight.
-export default function Header({ me, search, onAdd, onLogin, onLogout, onSaveButton, statsOpen, onStats, onStatsReady }) {
+export default function Header({ me, search, onAdd, onLogin, onLogout, onSaveButton, onDuplicates, statsOpen, onStats, onStatsReady }) {
   const [scrolled, setScrolled] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -145,7 +161,7 @@ export default function Header({ me, search, onAdd, onLogin, onLogout, onSaveBut
           <ThemeSwitch />
           {me?.owner ? (
             <>
-              <OwnerMenu canLogOut={me.mode === 'password'} onLogout={onLogout} onSaveButton={onSaveButton} />
+              <OwnerMenu canLogOut={me.mode === 'password'} onLogout={onLogout} onSaveButton={onSaveButton} onDuplicates={onDuplicates} />
               <StatsButton open={statsOpen} onClick={onStats} onReady={onStatsReady} />
               <button type="button" className="btn btn-primary btn-add" aria-label="Add links" onClick={onAdd}>
                 <Plus size={18} aria-hidden="true" />

@@ -1,20 +1,12 @@
-// Country names and flags from 2-letter codes ("US" → "United States", 🇺🇸), for the facts cards.
-const names = new Intl.DisplayNames(['en'], { type: 'region' });
-// Short names for the chips, the way people say them.
-const SHORT = { US: 'USA', GB: 'UK', AE: 'UAE', KR: 'South Korea', CZ: 'Czechia', RU: 'Russia' };
+// Country names and flags for the facts cards ("US" → "United States", 🇺🇸). The same helpers as
+// ../country-names.js (one list for the whole site); only "EU" reads "the EU" here ("Your data is kept in the EU").
+import { countryFlag, countryName as nameOf } from '../country-names.js';
 
-export function countryName(code, { short = false } = {}) {
-  if (!code) return '';
-  if (code === 'EU') return 'the EU';
-  if (short && SHORT[code]) return SHORT[code];
-  try {
-    return names.of(code) ?? code;
-  } catch {
-    return code;
-  }
+export { countryOf, countrySource } from '../country-names.js';
+
+export function countryName(code, options) {
+  return code === 'EU' ? 'the EU' : nameOf(code, options);
 }
 
-export function flag(code) {
-  if (!/^[A-Z]{2}$/.test(code ?? '')) return '';
-  return String.fromCodePoint(...[...code].map(letter => 0x1f1e6 + letter.charCodeAt(0) - 65));
-}
+// 🇺🇸 as text, or "" where the browser can't draw flags. Inside a page, <Flag code="US" /> (../Flag.jsx) is nicer.
+export const flag = countryFlag;

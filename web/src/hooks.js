@@ -11,8 +11,10 @@ const DEFAULTS = {
   broken: false, sort: 'newest', link: '', compare: '',
   // From the facts about each website: the company's country ("US") and "trust grade A or B". `stats` is the Stats page.
   country: '', trust: false, stats: false,
+  // The Explore map page, and the link or island picked on it.
+  explore: false, focus: '', island: '',
 };
-const YES_NO = new Set(['exact', 'favorite', 'free', 'broken', 'trust', 'stats']);
+const YES_NO = new Set(['exact', 'favorite', 'free', 'broken', 'trust', 'stats', 'explore']);
 // The choices that stay with you when Back leaves a search (see useUrlState).
 const KEPT_ON_BACK = ['category', 'source', 'collection', 'tag', 'level', 'status', 'favorite', 'free', 'broken', 'sort', 'country', 'trust'];
 
@@ -189,7 +191,7 @@ export function useTheme() {
     const apply = () => {
       const dark = choice === 'dark' || (choice === 'system' && media.matches);
       document.documentElement.dataset.theme = dark ? 'dark' : 'light';
-      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0f1220' : '#f6f7fb');
+      document.querySelector('meta[name="theme-color"]')?.setAttribute('content', dark ? '#0d0e11' : '#f6f7fb');
     };
     apply();
     try {

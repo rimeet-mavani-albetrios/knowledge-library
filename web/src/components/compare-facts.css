@@ -50,6 +50,28 @@
   --grade: #c4372f;
 }
 
+/* Dark mode: brighter grade colors, so the letter stays easy to read on the dark badge. */
+:root[data-theme='dark'] .cf-grade {
+  --grade: #5cc394;
+}
+
+:root[data-theme='dark'] .cf-grade.is-b {
+  --grade: #6bca75;
+}
+
+:root[data-theme='dark'] .cf-grade.is-c {
+  --grade: #ddb558;
+}
+
+:root[data-theme='dark'] .cf-grade.is-d {
+  --grade: #f78857;
+}
+
+:root[data-theme='dark'] .cf-grade.is-e,
+:root[data-theme='dark'] .cf-grade.is-f {
+  --grade: #f0796f;
+}
+
 .cf-grade + .compare-sub {
   margin-top: 3px;
 }

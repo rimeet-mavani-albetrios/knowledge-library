@@ -1,0 +1,244 @@
+/* The topics mosaic (mosaic.jsx): colored tiles placed by the script, in percent of the box, so they follow its size.
+   Each tile is tinted with its category's territory color (--hue), like the chips and cards elsewhere. */
+
+.stats-mosaic {
+  display: flex;
+  flex-direction: column;
+}
+
+.mosaic {
+  position: relative;
+  flex: 1;
+  min-height: 380px;
+  margin: 0 -3px -3px; /* the tiles' own 3px gap lines their outer edges up with the card's padding */
+  padding: 0;
+  list-style: none;
+}
+
+.mosaic-cell {
+  position: absolute;
+  padding: 3px;
+}
+
+.mosaic-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  padding: 10px 12px;
+  overflow: hidden;
+  border: 1px solid color-mix(in oklab, var(--hue) 26%, var(--surface));
+  border-radius: 12px;
+  background: color-mix(in oklab, var(--hue) 15%, var(--surface));
+  color: var(--hue-ink);
+  text-align: left;
+  transition: background-color 0.18s, border-color 0.18s, transform 0.18s;
+}
+
+/* A faint chart-paper grid inside each tile, the atlas look of the page. */
+.mosaic-tile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(color-mix(in oklab, var(--hue) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in oklab, var(--hue) 8%, transparent) 1px, transparent 1px);
+  background-size: 18px 18px;
+  pointer-events: none;
+}
+
+@media (hover: hover) {
+  .mosaic-tile:hover {
+    background: color-mix(in oklab, var(--hue) 26%, var(--surface));
+    border-color: color-mix(in oklab, var(--hue) 55%, var(--surface));
+  }
+}
+
+.mosaic-tile:active {
+  transform: scale(0.985);
+}
+
+.mosaic-tile:focus-visible {
+  outline-offset: -2px;
+  z-index: 1;
+}
+
+.mosaic-top,
+.mosaic-foot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.mosaic-top {
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.mosaic-icon {
+  flex: none;
+}
+
+.mosaic-share {
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.mosaic-foot {
+  flex-direction: column;
+}
+
+.mosaic-count {
+  font-family: var(--display);
+  font-size: var(--count-size, 20px);
+  font-weight: 750;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: color-mix(in oklab, var(--hue) 70%, var(--text));
+}
+
+.mosaic-name {
+  margin-top: 4px;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A middle tile: its name at the top, the number at the bottom. */
+.mosaic-cell.is-mid .mosaic-tile {
+  padding: 6px 8px;
+}
+
+.mosaic-cell.is-mid .mosaic-top {
+  min-width: 0;
+}
+
+.mosaic-cell.is-mid .mosaic-name {
+  margin-top: 0;
+  font-size: 12px;
+}
+
+/* "+8 more": the small topics together, plain and dashed so it reads as "the rest", not as a topic. Its chevron turns
+   when they are open. */
+.mosaic-tile.is-more {
+  justify-content: flex-end;
+  border: 1px dashed var(--line-strong);
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+
+.mosaic-tile.is-more::after {
+  display: none;
+}
+
+.mosaic-tile.is-more .mosaic-count {
+  color: var(--text);
+}
+
+.mosaic-more-chevron {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  color: var(--muted);
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.mosaic-tile.is-more[aria-expanded='true'] .mosaic-more-chevron {
+  transform: rotate(180deg);
+  color: var(--accent-text);
+}
+
+@media (hover: hover) {
+  .mosaic-tile.is-more:hover {
+    background: var(--line);
+    border-color: var(--muted);
+  }
+}
+
+.mosaic-tile.is-more[aria-expanded='true'] {
+  border-style: solid;
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.mosaic-tile.is-more[aria-expanded='true'] .mosaic-count {
+  color: var(--accent-text);
+}
+
+/* No links yet: a calm dashed box as big as the mosaic would be. */
+.mosaic-empty {
+  flex: 1;
+  align-content: center;
+  min-height: 300px;
+}
+
+/* The smaller topics, opened from "+N more": the same tiles, small, in a tidy grid. It doesn't grow or shrink with the
+   card, the mosaic above it does. */
+.mosaic-reveal {
+  flex: none;
+}
+
+.mosaic-small-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(148px, 46%), 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 9px 0 0; /* the tiles' own 3px gap under the mosaic and these 6 make the same 6px gap as between the tiles */
+  list-style: none;
+}
+
+.mosaic-small {
+  gap: 2px;
+  height: 66px;
+  padding: 8px 10px 7px;
+  border-radius: 10px;
+}
+
+.mosaic-small .mosaic-top {
+  justify-content: flex-start;
+}
+
+.mosaic-small .mosaic-name {
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.mosaic-small .mosaic-count {
+  position: relative;
+  z-index: 1;
+  font-size: 19px;
+}
+
+@media (max-width: 640px) {
+  .mosaic {
+    min-height: 460px; /* taller on a phone: it is narrow, and every topic with a tile here needs room for its name */
+  }
+
+  .mosaic-tile {
+    padding: 8px 9px;
+    border-radius: 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mosaic-tile,
+  .mosaic-more-chevron {
+    transition: none;
+  }
+
+  .mosaic-tile:active {
+    transform: none;
+  }
+}

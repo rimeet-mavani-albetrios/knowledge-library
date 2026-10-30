@@ -13,7 +13,7 @@ import {
 import { categoryStyle, hueOf } from '../categories.jsx';
 import { PHONE, useMediaQuery, VIEWS } from '../hooks.js';
 import { GitHubIcon } from './Icons.jsx';
-import { Dropdown, Popover } from './Popover.jsx';
+import { Dropdown, Popover, useRoomBelow } from './Popover.jsx';
 import { ActiveFilters, FiltersButton } from './Filters.jsx';
 import { useQuery } from '@tanstack/react-query';
 import { facetsQuery, usePrefetch } from '../useLinks.js';
@@ -34,6 +34,9 @@ const PHONE_TABS = 8;
 
 // The widest the "more" window gets on a computer (the same as .cat-pop in styles.css).
 const POP_WIDTH = 600;
+// The room the "more" window and the Sort list want under their buttons (the page moves up a little to make it).
+const POP_ROOM = 460;
+const SORT_ROOM = 370;
 
 // `short` is what the button says on phones, where there's less room.
 const SORTS = [
@@ -106,11 +109,13 @@ function CategoryPicker({ categories, category, total, more, known, onChange, on
   const [find, setFind] = useState('');
   const [left, setLeft] = useState(0); // where the window starts, from the left end of the tab line
   const button = useRef(null);
+  const wrap = useRef(null);
   const pop = useRef(null);
   const grid = useRef(null);
   const input = useRef(null);
   const phone = useMediaQuery(PHONE);
   const ready = useReady(onPrefetch);
+  useRoomBelow(open, button, wrap, POP_ROOM);
   // Closing also forgets what was typed in the find box, so it opens showing everything next time.
   const close = useCallback(() => {
     setOpen(false);
@@ -164,7 +169,7 @@ function CategoryPicker({ categories, category, total, more, known, onChange, on
   };
 
   return (
-    <div className="dropdown cat-picker" style={{ '--pop-left': `${left}px` }}>
+    <div ref={wrap} className="dropdown cat-picker" style={{ '--pop-left': `${left}px` }}>
       <button
         ref={button}
         type="button"
@@ -210,7 +215,7 @@ function CategoryPicker({ categories, category, total, more, known, onChange, on
                       <Icon size={17} aria-hidden="true" />
                     </span>
                     <span className="cat-item-name">{short}</span>
-                    <span className="cat-item-count">{count}</span>
+                    <span className="cat-item-count">{count.toLocaleString('en')}</span>
                     <Check size={16} aria-hidden="true" className="cat-item-check" />
                   </button>
                 );
@@ -324,6 +329,9 @@ function FolderTabs({ categories, library, category, total, onChange, onPrefetch
 
   const shown = phone ? phoneTabs(list, category) : fitTabs(list, sizes, category);
   const hidden = list.length - shown.length;
+  // "All" in the "more" window: every category. `total` only says that when none is chosen; with one chosen it's that
+  // category's own number, and the categories' counts (which never narrow themselves) add up to the real one.
+  const everyCategory = category ? categories.reduce((sum, item) => sum + item.count, 0) : total;
   // The chosen tab is the open one: clicking it again changes nothing ("All links" is the way back).
   const tab = (value, label, count) => {
     const on = category === value;
@@ -349,7 +357,7 @@ function FolderTabs({ categories, library, category, total, onChange, onPrefetch
       {tab('', 'All links')}
       {shown.map(({ value, count }) => tab(value, undefined, count))}
       {hidden > 0 && (
-        <CategoryPicker categories={list} category={category} total={total} more={hidden} known={known} onChange={onChange} onPrefetch={onPrefetch} />
+        <CategoryPicker categories={list} category={category} total={everyCategory} more={hidden} known={known} onChange={onChange} onPrefetch={onPrefetch} />
       )}
       {/* The hidden copy: "All links", "more" (with the most it could say), then every category. */}
       {!phone && (
@@ -465,7 +473,7 @@ function Toolbar({
           <FiltersButton params={params} setParams={setParams} data={facets} onDone={onFiltersDone} />
           {/* A search is in best-match order, so there's nothing to sort. */}
           {!params.q && (
-            <Dropdown title="Sort by" icon={ArrowUpDown} value={params.sort} options={SORTS} onChange={sort => setParams({ sort })} />
+            <Dropdown title="Sort by" icon={ArrowUpDown} value={params.sort} options={SORTS} onChange={sort => setParams({ sort })} roomBelow={SORT_ROOM} />
           )}
           {map && (
             <button
@@ -485,7 +493,7 @@ function Toolbar({
               className={`tool-btn${selecting ? ' is-on' : ''}`}
               aria-pressed={selecting}
               aria-label="Select links"
-              title="Select links to tag, move, read again or delete many at once"
+              title="Select links to tag, move or delete many at once"
               onClick={() => onSelecting(!selecting)}
             >
               <ListChecks size={16} aria-hidden="true" />

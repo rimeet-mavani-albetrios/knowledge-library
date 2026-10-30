@@ -1,5 +1,5 @@
-// The website's address: its secure lock (HTTPS) and since when it exists. Its chip says "Since 2016": the year the
-// company was founded (Wikidata), or else the year the address was registered.
+// The website's address: its secure lock (HTTPS) and since when it exists. Its tile shows the year the company was
+// founded (Wikidata), or else the year the address was first online.
 import { CalendarDays, Lock, LockOpen, Globe } from 'lucide-react';
 import { fullDate } from '../../../format.js';
 
@@ -18,9 +18,9 @@ function howLongAgo(date) {
 }
 
 export function glance(facts) {
-  if (facts.wikidata?.founded) return { icon: CalendarDays, text: `Since ${facts.wikidata.founded}`, tab: 'company' };
+  if (facts.wikidata?.founded) return { icon: CalendarDays, label: 'Founded', value: String(facts.wikidata.founded), rank: 50, spare: true, tab: 'company' };
   const created = facts.age?.created ? new Date(facts.age.created) : null;
-  return created ? { icon: CalendarDays, text: `Since ${created.getFullYear()}`, tab: 'trust' } : null;
+  return created ? { icon: CalendarDays, label: 'Online since', value: String(created.getFullYear()), rank: 50, spare: true, tab: 'trust' } : null;
 }
 
 export default function Website({ facts }) {

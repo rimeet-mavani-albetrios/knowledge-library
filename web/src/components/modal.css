@@ -5,9 +5,11 @@
   box-shadow: var(--shadow), 0 24px 60px rgb(20 24 43 / 0.18);
 }
 
+/* Dark: the window is a step lighter than the page (see "Raised" in styles.css), so a soft line is enough at its edge;
+   a deep shadow lifts it off the dimmed page. */
 :root[data-theme='dark'] .modal {
-  border-color: var(--line-strong);
-  box-shadow: var(--shadow), 0 24px 60px rgb(0 0 0 / 0.5);
+  border-color: var(--line);
+  box-shadow: var(--shadow), 0 24px 60px rgb(0 0 0 / 0.55);
 }
 
 .modal.modal-sm {

@@ -158,13 +158,15 @@ function LinkGrid({ params, setParams, owner, onOpen, onAdd, view, selecting, on
 
   if (query.isError && !query.data) {
     return (
-      <div className="empty">
-        <h2>Couldn’t load the library</h2>
-        <p>{query.error.message}</p>
-        <button type="button" className="btn btn-ghost" onClick={() => query.refetch()}>
-          <RefreshCw size={16} aria-hidden="true" /> Try again
-        </button>
-      </div>
+      <section className="results" id="results" aria-label="Links">
+        <div className="empty">
+          <h2>Couldn’t load the library</h2>
+          <p>{query.error.message}</p>
+          <button type="button" className="btn btn-ghost" onClick={() => query.refetch()}>
+            <RefreshCw size={16} aria-hidden="true" /> Try again
+          </button>
+        </div>
+      </section>
     );
   }
 
@@ -185,7 +187,7 @@ function LinkGrid({ params, setParams, owner, onOpen, onAdd, view, selecting, on
   let summary = '';
   if (!q) lastSummary.current = '';
   else if (loading) summary = lastSummary.current || `Searching for “${q}”…`;
-  else if (first?.closestOnly) summary = `Nothing matches “${searched}” closely. These are the nearest links.`;
+  else if (first?.closestOnly) summary = links.length ? `Nothing matches “${searched}” closely. These are the nearest links.` : ''; // none at all: "No matches" below says it
   else if (first) summary = `${first.total} ${first.total === 1 ? 'link' : 'links'} found for “${searched}”`;
   if (q && !loading) lastSummary.current = summary;
 
@@ -307,10 +309,13 @@ function LinkGrid({ params, setParams, owner, onOpen, onAdd, view, selecting, on
       </div>
 
       {allRelated && <div ref={setSentinel} className="sentinel" />}
+      {/* "Select all" takes the whole view, also the links not loaded yet (`total` is its real count), and all of a
+          search's results. Only the nearest links of a search that found nothing close have no such count. */}
       {selecting && (
         <BulkBar
           ids={[...selected]}
-          allIds={(grouped ? [...best, ...shownRelated] : links).map(link => link.id)}
+          shownIds={(grouped ? [...best, ...shownRelated] : links).map(link => link.id)}
+          view={first?.closestOnly ? null : { total: first?.total, filters: linkFilters(params) }}
           onSelect={setSelected}
           onDone={onStopSelecting}
         />

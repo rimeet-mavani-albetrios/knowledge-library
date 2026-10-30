@@ -110,9 +110,14 @@ function filterSql(filters, params, skip = '') {
   return clauses;
 }
 
-// The country of the company behind a website: from its Terms page, else from Wikidata. Two-letter codes ("US").
+// The country of a link, as a two-letter code ("US"), one answer for the filter, its counts and the Stats page:
+// the `place` fact (server/facts/kinds/place.js) once it's worked out, before that the company's Terms page or
+// Wikidata. Anything that isn't two capital letters counts as not known. (No "?" in here: filterSql's add() would
+// take it for the value's place.)
 export const COUNTRY_OF = table =>
-  `upper(coalesce(nullif(${table}.facts #>> '{company,country}', ''), nullif(${table}.facts #>> '{wikidata,country}', '')))`;
+  `substring(upper(CASE WHEN ${table}.facts -> 'place' IS NOT NULL THEN ${table}.facts #>> '{place,country}'
+    ELSE coalesce(nullif(${table}.facts #>> '{company,country}', ''), nullif(${table}.facts #>> '{wikidata,country}', '')) END)
+    from '^[A-Z]{2}$')`;
 export const UNKNOWN_COUNTRY = 'unknown'; // the country filter's value for links whose country isn't known (yet)
 
 const whereOf = clauses => (clauses.length ? `WHERE ${clauses.join(' AND ')}` : '');
@@ -194,6 +199,43 @@ export async function countLinks(filters = {}) {
   return rows[0].n;
 }
 
+// ---------- Every link in a view, for Select mode's "Select all" ----------
+
+// The most links one "Select all" (and one change to many links) takes at once. A bigger view gets its first
+// MAX_BULK links, in the list's order, and is told so: one click never changes the whole library by surprise.
+export const MAX_BULK = 2000;
+
+// The ids of every link the list shows for these filters, in the same order, not only the 24 loaded so far.
+// `capped` says the view has more than MAX_BULK links.
+export async function listIds({ filters = {}, sort = 'newest' } = {}) {
+  const params = [];
+  const clauses = filterSql(filters, params);
+  let order = OFFSET_SORTS[sort] ?? (sort === 'oldest' ? 'created_at ASC, id ASC' : 'created_at DESC, id DESC');
+  let from = 'links';
+  if (FACT_SORTS[sort]) {
+    order = FACT_SORTS[sort];
+    from = 'links LEFT JOIN link_facts AS lf ON lf.link_id = links.id';
+  }
+  params.push(MAX_BULK + 1); // one more than the most, to know whether there are more
+  const { rows } = await query(`SELECT links.id FROM ${from} ${whereOf(clauses)} ORDER BY ${order} LIMIT $${params.length}`, params);
+  return { ids: rows.slice(0, MAX_BULK).map(row => row.id), capped: rows.length > MAX_BULK, max: MAX_BULK };
+}
+
+// The same for a search: every result, best matches first, as the list shows them.
+export async function searchIds({ q, vector, filters = {} }) {
+  const params = [];
+  const cte = await searchCte(q, vector, filters, params);
+  if (!cte) return { ids: [], capped: false, max: MAX_BULK };
+  params.push(MAX_BULK + 1);
+  const { rows } = await query(
+    `${cte.with}
+     SELECT links.id FROM found JOIN links ON links.id = found.id
+     ORDER BY found.best DESC, found.score DESC, links.created_at DESC LIMIT $${params.length}`,
+    params,
+  );
+  return { ids: rows.slice(0, MAX_BULK).map(row => row.id), capped: rows.length > MAX_BULK, max: MAX_BULK };
+}
+
 // ---------- Smart search: words + meaning, best matches first, then the related ones ----------
 
 // Words of 4 letters or more also find longer words while you type ("ollam" finds "ollama", "edit" finds "editor").
@@ -246,9 +288,14 @@ async function searchCte(q, vector, filters, params) {
   let similarity = '0';
   if (vector) {
     const v = `${add(vector)}::vector`;
-    const clauses = ['embedding IS NOT NULL', ...filterSql(filters, params)];
+    // The 300 closest in the whole library, and then the filters: a filter only ever narrows the results. So the list
+    // says the same number as the filters' counts (facets(), which asks without the filters and counts them after).
+    const chosen = filterSql(filters, params);
     parts.push(`meaning AS (
-      SELECT id, 1 - (embedding <=> ${v}) AS similarity FROM links ${whereOf(clauses)} ORDER BY embedding <=> ${v} LIMIT 300
+      SELECT id, similarity FROM (
+        SELECT id, 1 - (embedding <=> ${v}) AS similarity FROM links WHERE embedding IS NOT NULL ORDER BY embedding <=> ${v} LIMIT 300
+      ) AS nearest
+      ${chosen.length ? `WHERE id IN (SELECT id FROM links ${whereOf(chosen)})` : ''}
     )`);
     sources.push('SELECT id FROM meaning');
     similarity = 'COALESCE(meaning.similarity, 0)';
@@ -623,13 +670,8 @@ export async function addLinks(entries, { tags = [], collection = '', note = '' 
   return result;
 }
 
-// Which of these addresses are already in the library, in any spelling (www, http/https, tracking codes…).
-export async function savedUrls(urls) {
-  const keys = new Map(urls.map(url => [url, urlKey(url)]));
-  const { rows } = await query('SELECT url_key FROM links WHERE url_key = ANY($1)', [[...new Set(keys.values())].filter(Boolean)]);
-  const taken = new Set(rows.map(row => row.url_key));
-  return urls.filter(url => taken.has(keys.get(url)));
-}
+// Which addresses are already in the library (and which are the same page or website as a saved link) is
+// checkUrls in duplicates.js, for the "Add links" window.
 
 // ---------- Editing ----------
 

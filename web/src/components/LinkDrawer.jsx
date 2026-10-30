@@ -1,30 +1,36 @@
-// The detail window: it opens in the middle of the screen with everything about one website on the left and,
-// on the right, the links in your library that do the same job, its tags and the small facts.
+// The detail window: a calm profile of one website. A slim bar on top keeps the main actions in reach (favorite,
+// copy, compare, open the website). Under it the whole window scrolls as one: the picture, the name and the key
+// facts first, then the tabs with everything about the website, and beside them the links in your library that do
+// the same job, its tags and the small facts.
 // The arrows (or the ← → keys) go through the results without closing it. The links next to it are loaded
 // ahead, and the one on screen stays (a little faded) until the next one is ready, so nothing blinks.
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   X, ExternalLink, Copy, Pencil, Trash2, Star, Check, Unlink, LoaderCircle, Folder, CircleAlert, ArrowRight, Search, FileText,
-  ChevronLeft, ChevronRight, ChevronDown, Globe, Columns3,
+  ChevronLeft, ChevronRight, Columns3, Ellipsis, Lightbulb,
 } from 'lucide-react';
 import { api, toQuery } from '../api.js';
 import { CategoryBadge, categoryStyle, hueOf } from '../categories.jsx';
-import { Dropdown } from './Popover.jsx';
+import { Dropdown, Popover } from './Popover.jsx';
 import { Preview, FavoriteButton, SiteIcon } from './LinkCard.jsx';
+import { SeeMore, Reveal } from './SeeMore.jsx';
 import Highlight from './Highlight.jsx';
 import { useToast } from './Toasts.jsx';
 import { useConfirm } from './Confirm.jsx';
 import { patchLinks, useUpdateLink, useCountOpen } from '../hooks.js';
-import { MAX_COMPARE, togglePick, useComparePicks } from '../compare.js';
-import FactsTabs, { Glance, factsQuery, useLinkFacts } from './facts/FactsTabs.jsx';
+import { MAX_COMPARE, forgetLinks, togglePick, useComparePicks } from '../compare.js';
+import FactsTabs, { Glance, factsBusy, factsQuery, useLinkFacts } from './facts/FactsTabs.jsx';
 import {
   compactNumber, fullDate, hostOf, timeAgo, PRICING_LABELS, STATUS_LABELS, LEVEL_LABELS, MY_STATUS_LABELS, isWorking,
 } from '../format.js';
 import './detail.css';
 
-const SHOWN_FEATURES = 5;
+const SHOWN_FEATURES = 6;
 const SHOWN_HEADINGS = 10;
+const LONG_TITLE = 64; // letters: a name longer than this gets a smaller size, so it stays at two or three lines
+const LONG_SUMMARY = 320; // letters: only a summary you wrote yourself gets this long; it opens with a button
+const SIDE_GAP = 20; // the side column's bottom stays this far from the window's bottom edge while it sticks
 const DISCARD = { title: 'Throw away your changes?', message: 'What you typed in the form will be lost.', confirmLabel: 'Throw away', danger: true };
 
 // The same key and request everywhere, so a link loaded ahead is found again when you reach it.
@@ -33,6 +39,10 @@ export const detailQuery = (id, q) => ({ queryKey: ['link', id, q], queryFn: () 
 const exactTime = date => new Intl.DateTimeFormat('en', { dateStyle: 'long', timeStyle: 'short' }).format(new Date(date));
 const times = n => `${n} ${n === 1 ? 'time' : 'times'}`;
 const splitList = (text, by) => text.split(by).map(item => item.trim()).filter(Boolean);
+const stillMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// How far an element sits below the top of the window's scrolling area, right now.
+const belowTop = (element, scroller) => element.getBoundingClientRect().top - scroller.getBoundingClientRect().top;
 
 // The part of the address after the website's name, or nothing for its home page.
 function pathOf(url) {
@@ -48,7 +58,7 @@ function pathOf(url) {
 function MyStatus({ link, owner }) {
   const update = useUpdateLink();
   if (!owner) {
-    return MY_STATUS_LABELS[link.myStatus] ? <span className="pill pill-status detail-status-pill">{MY_STATUS_LABELS[link.myStatus]}</span> : null;
+    return MY_STATUS_LABELS[link.myStatus] ? <span className="pill pill-status">{MY_STATUS_LABELS[link.myStatus]}</span> : null;
   }
   return (
     <div className="segmented segmented-text detail-status" role="group" aria-label="Your status">
@@ -70,22 +80,18 @@ function MyStatus({ link, owner }) {
 function Section({ title, action, children }) {
   return (
     <section className="detail-section">
-      {action ? (
-        <div className="detail-section-head">
-          <h3>{title}</h3>
-          {action}
-        </div>
-      ) : (
+      <div className="detail-section-head">
         <h3>{title}</h3>
-      )}
+        {action}
+      </div>
       {children}
     </section>
   );
 }
 
-// Puts this link in the compare tray, or takes it out. Once 4 links are picked, a fifth can't be added.
+// Puts this link in your compare picks, or takes it out. Once 4 links are picked, a fifth can't be added.
 // After adding, a message offers "Compare now" when there are 2 or more.
-function CompareToggle({ link, onCompare }) {
+function CompareToggle({ link, onCompare, className = '' }) {
   const picks = useComparePicks();
   const toast = useToast();
   const inCompare = picks.some(pick => pick.id === link.id);
@@ -93,9 +99,10 @@ function CompareToggle({ link, onCompare }) {
   return (
     <button
       type="button"
-      className={`btn btn-ghost detail-compare${inCompare ? ' is-on' : ''}${full ? ' is-full' : ''}`}
+      className={`btn btn-ghost detail-compare${inCompare ? ' is-on' : ''}${full ? ' is-full' : ''} ${className}`}
       aria-pressed={inCompare}
       aria-disabled={full || undefined}
+      aria-label={inCompare ? 'In compare' : 'Compare'}
       title={full ? 'You can compare up to 4 links' : inCompare ? 'Take it out of compare' : 'Add to compare'}
       onClick={() => {
         if (full) return;
@@ -110,23 +117,187 @@ function CompareToggle({ link, onCompare }) {
         });
       }}
     >
-      {inCompare ? <Check size={17} aria-hidden="true" /> : <Columns3 size={17} aria-hidden="true" />}
-      {inCompare ? 'In compare' : 'Compare'}
+      {inCompare ? <Check size={16} aria-hidden="true" /> : <Columns3 size={16} aria-hidden="true" />}
+      <span className="detail-compare-label">{inCompare ? 'In compare' : 'Compare'}</span>
     </button>
   );
 }
 
-// A list that shows its first few items, with a button for the rest.
-function ShortList({ items, shown, className, render }) {
+// The main button. It counts as using the link, like opening it from a card does.
+function OpenWebsite({ link, owner, className = '' }) {
+  const countOpen = useCountOpen();
+  return (
+    <a
+      className={`btn btn-primary detail-open ${className}`}
+      href={link.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title="Open the website (O)"
+      onClick={() => {
+        if (owner) countOpen(link.id);
+      }}
+    >
+      <ExternalLink size={16} aria-hidden="true" /> Open website
+    </a>
+  );
+}
+
+function CopyLink({ url }) {
+  const toast = useToast();
+  const [copied, setCopied] = useState(false);
+  const timer = useRef(null);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      clearTimeout(timer.current);
+      timer.current = setTimeout(() => setCopied(false), 1500);
+    } catch {
+      toast('Couldn’t copy. Select the address and copy it instead.', 'error');
+    }
+  };
+  return (
+    <button type="button" className={`icon-btn${copied ? ' detail-copied' : ''}`} onClick={copy} aria-label={copied ? 'Copied' : 'Copy link'} title={copied ? 'Copied' : 'Copy link'}>
+      {copied ? <Check size={18} aria-hidden="true" /> : <Copy size={18} aria-hidden="true" />}
+    </button>
+  );
+}
+
+// The ••• button: the owner's less common actions, tucked away so the bar stays calm. It is one of our own menus,
+// so on phones it slides up from the bottom of the screen like the others. Keys: ↑ ↓ move, Enter picks, Esc closes.
+function OwnerMenu({ onEdit, onDelete, deleting }) {
+  const [open, setOpen] = useState(false);
+  const close = useCallback(() => setOpen(false), []);
+  const button = useRef(null);
+  const pick = action => {
+    setOpen(false);
+    button.current?.focus();
+    action();
+  };
+  const onKey = event => {
+    if (event.key === 'Tab') {
+      setOpen(false);
+      return;
+    }
+    const items = [...event.currentTarget.querySelectorAll('[role="menuitem"]:not(:disabled)')];
+    const at = items.indexOf(document.activeElement);
+    const to = { ArrowDown: at + 1, ArrowUp: at - 1, Home: 0, End: items.length - 1 }[event.key];
+    if (to === undefined) return;
+    event.preventDefault();
+    items[(to + items.length) % items.length]?.focus();
+  };
+  return (
+    <div className="dropdown detail-owner-menu">
+      <button
+        ref={button}
+        type="button"
+        className={`icon-btn${open ? ' is-open' : ''}`}
+        aria-label="More actions"
+        title="More actions"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen(!open)}
+      >
+        <Ellipsis size={20} aria-hidden="true" />
+      </button>
+      <Popover open={open} onClose={close} anchor={button} label="More actions" role="menu" className="detail-menu" focusFirst="[role='menuitem']">
+        <div onKeyDown={onKey}>
+          <button type="button" role="menuitem" className="menu-option" onClick={() => pick(onEdit)}>
+            <Pencil size={16} aria-hidden="true" className="menu-icon" />
+            <span className="menu-text">Edit</span>
+          </button>
+          <button type="button" role="menuitem" className="menu-option is-danger" disabled={deleting} onClick={() => pick(onDelete)}>
+            <Trash2 size={16} aria-hidden="true" className="menu-icon" />
+            <span className="menu-text">Delete</span>
+          </button>
+        </div>
+      </Popover>
+    </div>
+  );
+}
+
+// A list that shows its first few items, with a button that slides the rest open.
+function ShortList({ items, shown, className, render, id }) {
   const [all, setAll] = useState(false);
   return (
     <>
-      <ul className={className}>{(all ? items : items.slice(0, shown)).map(render)}</ul>
-      {items.length > shown && (
-        <button type="button" className="detail-link-btn" onClick={() => setAll(!all)}>
-          {all ? 'Show less' : `Show all ${items.length}`}
+      <ul className={className}>{items.slice(0, shown).map(render)}</ul>
+      {items.length > shown ? (
+        <>
+          <Reveal open={all} id={id}>
+            <ul className={`${className} is-rest`}>{items.slice(shown).map((item, index) => render(item, index + shown))}</ul>
+          </Reveal>
+          <SeeMore className="detail-see-more" open={all} controls={id} more={`Show all ${items.length}`} onClick={() => setAll(!all)} />
+        </>
+      ) : null}
+    </>
+  );
+}
+
+// What shape each picture really is, remembered for the time the page is open: coming back to a link (or reaching one
+// that was loaded ahead) draws its frame in the right shape at once.
+const pictureShapes = new Map();
+const FLATTEST = 2.4; // wider pictures sit in a frame of this shape, with quiet space above and below
+const NARROWEST = 1.55; // narrower ones (a square, a poster) sit in a frame of the usual 16:9 shape, with quiet space at the sides
+const frameShape = shape => (shape < NARROWEST ? 16 / 9 : Math.min(shape, FLATTEST));
+const shapeOf = image => image.naturalWidth / image.naturalHeight;
+// Shapes far from the usual ones show whole, with quiet space around them (phones have one frame shape for all).
+const shapeClass = shape => (shape < 1.6 ? ' is-odd is-tall' : shape > 2.2 ? ' is-odd' : '');
+
+// The picture in its own shape, never cut and never stretched. The frame takes the picture's shape once it is known,
+// and the room saved for it (see .detail-picture) is as tall as the tallest frame, so nothing under it can jump.
+// Clicking it opens the website, like the big button does.
+function HeroPicture({ link, owner }) {
+  const box = useRef(null);
+  const countOpen = useCountOpen();
+  const [shape, setShape] = useState(() => pictureShapes.get(link.imageUrl) ?? null);
+  const measure = image => {
+    if (!image?.naturalWidth) return;
+    pictureShapes.set(link.imageUrl, shapeOf(image));
+    setShape(shapeOf(image));
+  };
+  // Already there when the window is drawn (in the browser's memory): the right shape before the first paint.
+  useLayoutEffect(() => {
+    const image = box.current.querySelector('.preview-picture');
+    if (image?.complete) measure(image);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  return (
+    <a
+      ref={box}
+      className={`detail-picture${shape ? shapeClass(shape) : ''}`}
+      href={link.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      tabIndex={-1}
+      aria-hidden="true"
+      style={shape ? { '--shape': frameShape(shape), '--picture-shape': shape } : undefined}
+      onClick={() => {
+        if (owner) countOpen(link.id);
+      }}
+      onLoad={event => {
+        if (event.target.matches('.preview-picture')) measure(event.target);
+      }}
+    >
+      <Preview link={link} big />
+    </a>
+  );
+}
+
+// The short summary. Only one you wrote yourself can be long: it then shows four lines and a button for the rest.
+function HeroSummary({ text }) {
+  const [all, setAll] = useState(false);
+  if (!text) return null;
+  const long = text.length > LONG_SUMMARY;
+  return (
+    <>
+      <p className={`detail-summary${long && !all ? ' is-short' : ''}`}>{text}</p>
+      {long ? (
+        <button type="button" className="detail-link-btn detail-summary-more" onClick={() => setAll(!all)}>
+          {all ? 'Show less' : 'Read all'}
         </button>
-      )}
+      ) : null}
     </>
   );
 }
@@ -146,27 +317,53 @@ function knownLink(queryClient, id) {
   return undefined;
 }
 
-// Grey shapes in the window's layout, only for the very first open when there is nothing to show yet.
-function Skeleton({ side = false }) {
-  if (side) {
-    return (
-      <div className="detail-skeleton" aria-hidden="true">
-        <span className="is-pill" />
-        <span className="is-row" />
-        <span className="is-row" />
-        <span className="is-row" />
-      </div>
-    );
-  }
+// Grey rows for "Similar" while they are on their way.
+function SimilarSkeleton() {
   return (
-    <div className="detail-skeleton">
-      <span className="is-hero" aria-hidden="true" />
-      <span className="is-pill" aria-hidden="true" />
-      <span className="is-title" aria-hidden="true" />
-      <span className="is-text" aria-hidden="true" />
-      <span className="is-text is-short" aria-hidden="true" />
-      <span className="sr-only">Loading…</span>
+    <div className="detail-skeleton-rows" aria-hidden="true">
+      <span className="detail-bone is-row" />
+      <span className="detail-bone is-row" />
+      <span className="detail-bone is-row" />
+      <span className="detail-bone is-row" />
     </div>
+  );
+}
+
+// Grey shapes in the window's layout, only for the very first open when there is nothing to show yet.
+function Skeleton() {
+  return (
+    <>
+      <div className="detail-hero" aria-hidden="true">
+        <div className="detail-picture">
+          <span className="detail-bone is-picture" />
+        </div>
+        <div className="detail-intro">
+          <span className="detail-bone is-pill" />
+          <span className="detail-bone is-title" />
+          <span className="detail-bone is-line" />
+          <span className="detail-bone is-text" />
+          <span className="detail-bone is-text is-short" />
+          <div className="facts-glance">
+            <span className="glance-ghost" />
+            <span className="glance-ghost" />
+            <span className="glance-ghost" />
+            <span className="glance-ghost" />
+          </div>
+        </div>
+      </div>
+      <div className="detail-columns" aria-hidden="true">
+        <div className="detail-main">
+          <span className="detail-bone is-tabs" />
+          <span className="detail-bone is-block" />
+          <span className="detail-bone is-text" />
+          <span className="detail-bone is-text is-short" />
+        </div>
+        <div className="detail-side">
+          <SimilarSkeleton />
+        </div>
+      </div>
+      <span className="sr-only">Loading…</span>
+    </>
   );
 }
 
@@ -193,6 +390,10 @@ function EditForm({ link, categories, onDone, onDirty }) {
     onDirty(dirty);
     return () => onDirty(false);
   }, [dirty, onDirty]);
+  // The cursor is ready in the first box. (Not on touch screens, where it would slide the keyboard over the form.)
+  useEffect(() => {
+    if (window.matchMedia('(hover: hover)').matches) titleRef.current?.focus({ preventScroll: true });
+  }, []);
 
   const save = useMutation({
     mutationFn: () =>
@@ -232,7 +433,7 @@ function EditForm({ link, categories, onDone, onDirty }) {
         <span className="hint">{hostOf(link.url)}</span>
       </div>
       <label>
-        Title
+        <span className="detail-field-name">Title</span>
         <input
           ref={titleRef}
           className="input"
@@ -245,39 +446,49 @@ function EditForm({ link, categories, onDone, onDirty }) {
             if (titleError && event.target.value.trim()) setTitleError('');
           }}
         />
-        {titleError && (
+        {titleError ? (
           <span className="field-error" id="detail-title-error" role="alert">
             {titleError}
           </span>
-        )}
+        ) : null}
       </label>
       <div className="detail-form-row">
         <div className="detail-field">
-          Category
+          <span className="detail-field-name">Category</span>
           <Dropdown title="Category" className="detail-dropdown" value={form.category} options={options} onChange={category => setForm({ ...form, category })} />
         </div>
         <label>
-          Collection <span className="hint">optional</span>
+          <span className="detail-field-name">
+            Collection <span className="hint">optional</span>
+          </span>
           <input className="input" maxLength={80} {...field('collection')} placeholder="Video tools" />
         </label>
       </div>
       <label>
-        Tags <span className="hint">separate with commas</span>
+        <span className="detail-field-name">
+          Tags <span className="hint">separate with commas</span>
+        </span>
         <input className="input" {...field('tags')} placeholder="video, free, editing" />
       </label>
       <label>
-        Summary <span className="hint">up to 1000 letters</span>
+        <span className="detail-field-name">
+          Summary <span className="hint">up to 1000 letters</span>
+        </span>
         <textarea className="input" rows={3} maxLength={1000} {...field('summary')} />
       </label>
       <label>
-        What you can do with it <span className="hint">one per line, helps search find it</span>
+        <span className="detail-field-name">
+          What you can do with it <span className="hint">one per line, helps search find it</span>
+        </span>
         <textarea className="input" rows={4} {...field('tasks')} placeholder={'convert PDF to Excel\nmerge PDFs'} />
       </label>
       <label>
-        Your note <span className="hint">helps search find it</span>
+        <span className="detail-field-name">
+          Your note <span className="hint">helps search find it</span>
+        </span>
         <textarea className="input" rows={2} maxLength={1000} {...field('note')} placeholder="Why you saved this" />
       </label>
-      {save.isError && <p className="form-error">{save.error.message}</p>}
+      {save.isError ? <p className="form-error">{save.error.message}</p> : null}
       <div className="form-actions">
         <button type="button" className="btn btn-ghost" onClick={cancel}>
           Cancel
@@ -290,14 +501,66 @@ function EditForm({ link, categories, onDone, onDirty }) {
   );
 }
 
+// Important links, the website's headings and the pages read: folded, because you rarely need them.
+function MoreDetails({ link, headings }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="detail-more">
+      <SeeMore open={open} more="More details" less="Fewer details" controls={`detail-more-${link.id}`} onClick={() => setOpen(!open)} />
+      <Reveal open={open} id={`detail-more-${link.id}`}>
+        {link.pageLinks?.length > 0 ? (
+          <Section title="Important links">
+            <div className="detail-page-links">
+              {link.pageLinks.map((item, index) => (
+                <a key={`${index}-${item.url}`} href={item.url} target="_blank" rel="noopener noreferrer">
+                  {item.label} <ExternalLink size={13} aria-hidden="true" />
+                </a>
+              ))}
+            </div>
+          </Section>
+        ) : null}
+        {headings.length > 0 ? (
+          <Section title="What’s on the website">
+            <ShortList
+              id={`detail-headings-${link.id}`}
+              items={headings}
+              shown={SHOWN_HEADINGS}
+              className="detail-headings"
+              render={(heading, index) => <li key={`${index}-${heading}`}>{heading}</li>}
+            />
+          </Section>
+        ) : null}
+        {link.pagesRead?.length > 0 ? (
+          <Section title="Pages read">
+            <div className="detail-pages">
+              {link.pagesRead.map((page, index) => (
+                <a key={`${index}-${page.url}`} href={page.url} target="_blank" rel="noopener noreferrer">
+                  <FileText size={13} aria-hidden="true" /> <span>{page.label || page.title || hostOf(page.url)}</span>
+                </a>
+              ))}
+            </div>
+          </Section>
+        ) : null}
+        {link.searchWords?.length > 0 ? (
+          <Section title="Also found by">
+            <p className="detail-words">{link.searchWords.join(', ')}</p>
+          </Section>
+        ) : null}
+      </Reveal>
+    </div>
+  );
+}
+
 // `ids` are the results on screen, in order, so the arrows can go to the one before or after.
 // `onNearEnd` loads more results when you reach the last ones.
 // `instant`: the window swaps in without its fade (coming straight from the compare window).
 export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose, onOpen, onTag, onNearEnd, onCompare, instant = false }) {
   const ref = useRef(null);
-  const bodyRef = useRef(null);
-  const mainRef = useRef(null);
+  const bodyRef = useRef(null); // the one scrolling area
   const sideRef = useRef(null);
+  const topMark = useRef(null); // an empty mark at the very top of the scrolling area
+  const nameRef = useRef(null); // the big name
+  const pressedBackdrop = useRef(false); // the click that closes must start AND end on the dark background
   const queryClient = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
@@ -307,12 +570,12 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   const setDirty = useCallback(value => {
     dirty.current = value;
   }, []);
-  const [copied, setCopied] = useState(false);
-  const copyTimer = useRef(null);
   const shown = useRef(false); // a link was on screen during the last render
   // The facts tab stays the same while you go through the results with the arrows, so you can compare them.
   const [tab, setTab] = useState('overview');
   const factsRef = useRef(null);
+  const [scrolled, setScrolled] = useState(false); // the window is scrolled: the top bar gets its hairline
+  const [pastName, setPastName] = useState(false); // the big name is out of sight: the top bar shows a small one
 
   const position = ids.indexOf(id);
   const previous = position > 0 ? ids[position - 1] : null;
@@ -328,6 +591,7 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
     placeholderData: old => (shown.current ? old : knownLink(queryClient, id)),
   });
   const link = detail.data?.link;
+  const hasLink = Boolean(link);
   const similarLoading = detail.data?.similar === null; // shown from the list; the similar links are on their way
   const similar = detail.data?.similar ?? [];
   const switching = detail.isPlaceholderData && !similarLoading;
@@ -335,39 +599,99 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
     shown.current = Boolean(id && link);
   });
   const facts = useLinkFacts(id, owner);
-  // Only this link's facts: while the next link loads, the one on screen doesn't get its chips.
+  // Only this link's facts: while the next link loads, the one on screen doesn't get its tiles.
   const factsData = link?.id === id ? facts.data : undefined;
   useEffect(() => {
     if (!id) setTab('overview');
   }, [id]);
+
+  // A fact tile opens its tab. When the tabs are low on the screen (a phone, a short window) they come up too.
   const pickTab = useCallback(to => {
     setTab(to);
-    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    factsRef.current?.scrollIntoView({ block: 'nearest', behavior: still ? 'auto' : 'smooth' });
+    const body = bodyRef.current;
+    const box = factsRef.current;
+    if (!body || !box) return;
+    const below = belowTop(box, body);
+    if (below > body.clientHeight / 2) body.scrollTo({ top: body.scrollTop + below, behavior: stillMotion() ? 'auto' : 'smooth' });
   }, []);
+
+  // A new tab starts at its own beginning: with the tabs stuck under the top bar, the window goes back up to them.
+  useLayoutEffect(() => {
+    const body = bodyRef.current;
+    const box = factsRef.current;
+    if (!body || !box) return;
+    const above = belowTop(box, body);
+    if (above < 0) body.scrollTop += above;
+  }, [tab]);
 
   useEffect(() => {
     if (position >= 0 && position >= ids.length - 3) onNearEnd?.();
   }, [position, ids.length, onNearEnd]);
 
   // The window opens and closes before the screen is drawn, so going straight to or from the compare window
-  // happens in one frame.
+  // happens in one frame. The focus goes to the scrolling area, so ↑ ↓ and PageDown scroll the window right away
+  // (and no button gets a focus ring for nothing).
   useLayoutEffect(() => {
     const dialog = ref.current;
-    if (id && !dialog.open) dialog.showModal();
+    if (id && !dialog.open) {
+      dialog.showModal();
+      bodyRef.current?.focus({ preventScroll: true });
+    }
     if (!id && dialog.open) dialog.close();
   }, [id]);
   useEffect(() => {
     setEditing(false);
-    setCopied(false);
     // Opening a link counts as using it, so the ones you use most come up first in search.
     if (id && owner) countOpen(id);
   }, [id, owner, countOpen]);
 
-  // Each new link starts at the top of both columns (and of the whole window on small screens).
+  // Each new link starts at the top of the window.
   useLayoutEffect(() => {
-    for (const column of [bodyRef, mainRef, sideRef]) column.current?.scrollTo?.(0, 0);
+    bodyRef.current?.scrollTo?.(0, 0);
+    setScrolled(false);
+    setPastName(false);
   }, [id]);
+
+  // A new link on screen can take the focused button away with it (a row in the "Similar" list). The focus then comes
+  // back to the scrolling area, so ↑ ↓ keep scrolling the window.
+  const linkId = link?.id;
+  useEffect(() => {
+    const focused = document.activeElement;
+    if (linkId && (!focused || focused === document.body)) bodyRef.current?.focus({ preventScroll: true });
+  }, [linkId]);
+
+  // The top bar's hairline and its small name, without listening to every scroll: the browser says when the top
+  // mark and the big name leave the scrolling area.
+  useEffect(() => {
+    const body = bodyRef.current;
+    if (!body || !hasLink) return undefined;
+    const observer = new IntersectionObserver(
+      entries => {
+        for (const entry of entries) {
+          if (entry.target === topMark.current) setScrolled(!entry.isIntersecting);
+          else setPastName(!entry.isIntersecting);
+        }
+      },
+      { root: body },
+    );
+    if (topMark.current) observer.observe(topMark.current);
+    if (nameRef.current) observer.observe(nameRef.current);
+    else setPastName(false); // the edit form has no big name
+    return () => observer.disconnect();
+  }, [hasLink, editing]);
+
+  // The side column stays in view while a long tab scrolls. A side column taller than the window sticks only once
+  // its bottom has come into view, so nothing in it can ever be out of reach (see .detail-side).
+  useEffect(() => {
+    const body = bodyRef.current;
+    const side = sideRef.current;
+    if (!body || !side) return undefined;
+    const place = () => side.style.setProperty('--side-top', `${Math.min(0, body.clientHeight - side.offsetHeight - SIDE_GAP)}px`);
+    const observer = new ResizeObserver(place);
+    observer.observe(body);
+    observer.observe(side);
+    return () => observer.disconnect();
+  }, [hasLink, editing]);
 
   // The links on either side are loaded ahead, pictures included, so the arrows feel instant.
   useEffect(() => {
@@ -378,7 +702,9 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
       queryClient.prefetchQuery(factsQuery(other));
       queryClient.prefetchQuery(query).then(() => {
         const url = queryClient.getQueryData(query.queryKey)?.link.imageUrl;
-        if (url) Object.assign(new Image(), { referrerPolicy: 'no-referrer', src: url });
+        if (!url) return;
+        const image = Object.assign(new Image(), { referrerPolicy: 'no-referrer', src: url });
+        image.onload = () => pictureShapes.set(url, shapeOf(image));
       });
     }
   }, [id, next, previous, q, queryClient]);
@@ -395,9 +721,9 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   const go = useCallback(to => to && leave(() => onOpen(to)), [leave, onOpen]);
   const close = () => leave(onClose);
 
-  // ← → and Esc on the keyboard. Listening on the page (not the window) keeps them working after a click removed
-  // the focused button, like a row in the "Similar" list that is gone once the next link shows. Esc is handled
-  // here too, so closing always goes through `close` (and its unsaved-changes question) in every browser.
+  // ← → and Esc on the keyboard, and O for the website. Listening on the page (not the window) keeps them working
+  // after a click removed the focused button, like a row in the "Similar" list that is gone once the next link shows.
+  // Esc is handled here too, so closing always goes through `close` (and its unsaved-changes question) in every browser.
   const closeRef = useRef(close);
   closeRef.current = close;
   useEffect(() => {
@@ -407,13 +733,17 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
       if (event.target !== document.body && !ref.current.contains(event.target)) return; // another window has the keys
       if (document.querySelectorAll('dialog[open]').length > 1) return; // a question is open on top of this window
       if (event.key === 'Escape') {
-        if (event.target.closest?.('[aria-expanded="true"], [role="listbox"]')) return; // Esc closes that menu first
+        if (event.target.closest?.('[aria-expanded="true"], [role="listbox"], [role="menu"]')) return; // Esc closes that menu first
         event.preventDefault();
         closeRef.current();
         return;
       }
+      if (editing || event.target.closest?.('input, textarea, select, [contenteditable], [role="menu"], [role="listbox"]')) return;
+      if (event.key === 'o' || event.key === 'O') {
+        ref.current.querySelector('.detail-open')?.click();
+        return;
+      }
       if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-      if (editing || event.target.closest?.('input, textarea, select, [contenteditable]')) return;
       const to = event.key === 'ArrowLeft' ? previous : next;
       if (to) {
         event.preventDefault();
@@ -423,8 +753,6 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [id, editing, previous, next, go]);
-
-  useEffect(() => () => clearTimeout(copyTimer.current), []);
 
   // Hidden on 2026-10-28: a periodic background refresh is planned instead.
   // Needs `trackLinks` from ../hooks.js and `RefreshCw` from lucide-react when it comes back.
@@ -445,11 +773,10 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   const remove = useMutation({
     mutationFn: () => api(`/links/${id}`, { method: 'DELETE' }),
     onSuccess: () => {
+      // It leaves your compare picks and recent comparisons too, and an open comparison gets fresh copies.
+      forgetLinks([id]);
       queryClient.removeQueries({ queryKey: ['link', id] });
-      queryClient.invalidateQueries({ queryKey: ['links'] });
-      queryClient.invalidateQueries({ queryKey: ['facets'] });
-      queryClient.invalidateQueries({ queryKey: ['me'] });
-      queryClient.invalidateQueries({ queryKey: ['map'] });
+      for (const key of ['links', 'facets', 'me', 'map', 'compare', 'compare-facts']) queryClient.invalidateQueries({ queryKey: [key] });
       toast('Link deleted');
       onClose();
     },
@@ -466,20 +793,18 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
     if (sure) remove.mutate();
   }
 
-  async function copyLink() {
-    try {
-      await navigator.clipboard.writeText(link.url);
-      setCopied(true);
-      clearTimeout(copyTimer.current);
-      copyTimer.current = setTimeout(() => setCopied(false), 1500);
-    } catch {
-      toast('Couldn’t copy. Select the address and copy it instead.', 'error');
-    }
-  }
+  // The edit form sits where the name was, at the top of the window, wherever you were when you asked for it.
+  const startEditing = () => {
+    setEditing(true);
+    bodyRef.current?.scrollTo(0, 0);
+  };
+  const toTop = () => bodyRef.current?.scrollTo({ top: 0, behavior: stillMotion() ? 'auto' : 'smooth' });
 
   const path = link ? pathOf(link.url) : '';
   const headings = link?.headings?.filter(heading => heading !== link.title) ?? [];
   const hasMore = Boolean(link && (link.pageLinks?.length || headings.length || link.pagesRead?.length || link.searchWords?.length));
+  const compareThis = compareIds => leave(() => onCompare(compareIds));
+  const showName = pastName && !editing;
 
   return (
     <dialog
@@ -494,105 +819,117 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
           close();
         }
       }}
-      onClick={event => event.target === ref.current && close()}
+      onPointerDown={event => {
+        pressedBackdrop.current = event.target === ref.current;
+      }}
+      onClick={event => {
+        // A click on the dark background closes it. Selecting text and letting go outside the window does not.
+        if (pressedBackdrop.current && event.target === ref.current) close();
+      }}
     >
       {/* `id ? … : null`, not `id && …`: an empty id would become an empty text child, and React then clears the
           whole window with textContent, messages placed in it included (see Toasts.jsx). */}
       {id ? (
         <>
-          <div className="detail-window" aria-busy={switching || undefined}>
-            {switching && <div className="detail-progress" aria-hidden="true" />}
+          <div className={`detail-window${scrolled ? ' is-scrolled' : ''}`} aria-busy={switching || undefined}>
+            {switching ? <div className="detail-progress" aria-hidden="true" /> : null}
 
+            {/* The slim bar: where you are in the results on the left, the main actions on the right. */}
             <header className="detail-top">
-              {hasNav && (
+              {hasNav ? (
                 <nav className="detail-nav" aria-label="Results">
                   <button type="button" className="icon-btn" onClick={() => go(previous)} disabled={!previous} aria-label="Previous result" title="Previous result (←)">
-                    <ChevronLeft size={20} />
+                    <ChevronLeft size={20} aria-hidden="true" />
                   </button>
                   <span className="detail-pos">
                     {position + 1} <span>of</span> {ids.length}
                   </span>
                   <button type="button" className="icon-btn" onClick={() => go(next)} disabled={!next} aria-label="Next result" title="Next result (→)">
-                    <ChevronRight size={20} />
+                    <ChevronRight size={20} aria-hidden="true" />
                   </button>
                 </nav>
-              )}
-              <button type="button" className="icon-btn detail-close" onClick={close} aria-label="Close details" title="Close (Esc)">
-                <X size={20} />
-              </button>
-            </header>
-
-            <div className="detail-body" ref={bodyRef}>
-              <article className="detail-main" ref={mainRef}>
+              ) : null}
+              {link ? (
+                <button
+                  type="button"
+                  className={`detail-mini${showName ? ' is-shown' : ''}`}
+                  tabIndex={showName ? 0 : -1}
+                  aria-hidden={!showName}
+                  title="Back to the top"
+                  onClick={toTop}
+                >
+                  <SiteIcon link={link} className="row-icon detail-mini-icon" />
+                  <span>{link.title}</span>
+                </button>
+              ) : null}
+              <div className="detail-tools">
                 {link ? (
                   <>
-                    {/* A new key per link: a picture that failed for one link must not hide the next one's. */}
-                    <div className="detail-hero">
-                      <Preview key={link.id} link={link} big />
-                    </div>
+                    <FavoriteButton link={link} owner={owner} className="icon-btn detail-wide" />
+                    <CopyLink key={link.id} url={link.url} />
+                    <CompareToggle link={link} onCompare={compareThis} className="detail-wide" />
+                    <OpenWebsite link={link} owner={owner} className="detail-wide" />
+                    {owner ? <OwnerMenu onEdit={startEditing} onDelete={removeLink} deleting={remove.isPending} /> : null}
+                    <span className="detail-tools-line" aria-hidden="true" />
+                  </>
+                ) : null}
+                <button type="button" className="icon-btn detail-close" onClick={close} aria-label="Close details" title="Close (Esc)">
+                  <X size={20} aria-hidden="true" />
+                </button>
+              </div>
+            </header>
 
+            {/* The whole window scrolls as one, so its scrollbar sits at the window's right edge. */}
+            <div className="detail-body" ref={bodyRef} tabIndex={-1}>
+              <span className="detail-top-mark" ref={topMark} aria-hidden="true" />
+              {link ? (
+                <>
+                  <section className="detail-hero">
+                    {/* A new key per link: a picture that failed for one link must not hide the next one's. */}
+                    <HeroPicture key={link.id} link={link} owner={owner} />
                     {editing ? (
-                      <EditForm key={link.id} link={link} categories={categories} onDone={() => setEditing(false)} onDirty={setDirty} />
+                      <EditForm key={`edit-${link.id}`} link={link} categories={categories} onDone={() => setEditing(false)} onDirty={setDirty} />
                     ) : (
-                      <>
+                      <div className="detail-intro">
                         <div className="detail-pills">
                           <CategoryBadge name={link.category} />
-                          {PRICING_LABELS[link.pricing] && <span className="pill">{PRICING_LABELS[link.pricing]}</span>}
-                          {LEVEL_LABELS[link.level] && <span className="pill">{LEVEL_LABELS[link.level]}</span>}
-                          {isWorking(link) && (
+                          {PRICING_LABELS[link.pricing] ? <span className="pill">{PRICING_LABELS[link.pricing]}</span> : null}
+                          {LEVEL_LABELS[link.level] ? <span className="pill">{LEVEL_LABELS[link.level]}</span> : null}
+                          {isWorking(link) ? (
                             <span className="pill pill-accent">
                               <LoaderCircle size={13} className="spin" aria-hidden="true" /> {STATUS_LABELS[link.status]}
                             </span>
-                          )}
+                          ) : null}
+                          {link.health === 'broken' ? (
+                            <span className="pill pill-gone" title="The page seems to be gone.">
+                              <Unlink size={13} aria-hidden="true" /> May be broken
+                            </span>
+                          ) : null}
+                          {!owner ? <MyStatus link={link} owner={owner} /> : null}
                         </div>
-                        <h2 className="detail-title">{link.title}</h2>
+                        <h2 ref={nameRef} className={`detail-title${link.title.length > LONG_TITLE ? ' is-long' : ''}`}>
+                          {link.title}
+                        </h2>
                         <p className="detail-where">
                           <a className="detail-url" href={link.url} target="_blank" rel="noopener noreferrer" title={link.url}>
-                            <Globe size={14} aria-hidden="true" />
+                            <SiteIcon link={link} className="detail-url-icon" />
                             <span className="detail-host">{hostOf(link.url)}</span>
-                            {path && <span className="detail-path">{path}</span>}
+                            {path ? <span className="detail-path">{path}</span> : null}
                           </a>
                           <span className="detail-when" title={`Added ${exactTime(link.createdAt)}`}>
                             Added <time dateTime={link.createdAt}>{fullDate(link.createdAt)}</time>
                           </span>
-                          {link.opens > 0 && <span className="detail-when">Opened {times(link.opens)}</span>}
+                          {link.opens > 0 ? <span className="detail-when">Opened {times(link.opens)}</span> : null}
                         </p>
-                        <Glance
-                          link={link}
-                          data={factsData}
-                          loading={link.source === 'web' && (!factsData || factsData.collecting || (owner && factsData.pending.length > 0))}
-                          onPick={pickTab}
-                        />
+                        <HeroSummary key={link.id} text={link.summary || link.description} />
+                        <Glance link={link} data={factsData} loading={factsBusy(factsData, link.id, owner)} onPick={pickTab} />
+                      </div>
+                    )}
+                  </section>
 
-                        <div className="detail-actions">
-                          <a className="btn btn-primary" href={link.url} target="_blank" rel="noopener noreferrer" onClick={() => owner && countOpen(link.id)}>
-                            <ExternalLink size={17} aria-hidden="true" /> Open website
-                          </a>
-                          <button
-                            type="button"
-                            className={`icon-btn${copied ? ' detail-copied' : ''}`}
-                            onClick={copyLink}
-                            aria-label={copied ? 'Copied' : 'Copy link'}
-                            title={copied ? 'Copied' : 'Copy link'}
-                          >
-                            {copied ? <Check size={18} /> : <Copy size={18} />}
-                          </button>
-                          <FavoriteButton link={link} owner={owner} className="icon-btn" />
-                          <CompareToggle link={link} onCompare={compareIds => leave(() => onCompare(compareIds))} />
-                          {owner && (
-                            <>
-                              <button type="button" className="icon-btn" title="Edit" aria-label="Edit" onClick={() => setEditing(true)}>
-                                <Pencil size={18} />
-                              </button>
-                              <button type="button" className="icon-btn danger" title="Delete" aria-label="Delete" onClick={removeLink} disabled={remove.isPending}>
-                                <Trash2 size={18} />
-                              </button>
-                            </>
-                          )}
-                        </div>
-
-                        <MyStatus link={link} owner={owner} />
-
+                  {editing ? null : (
+                    <div className="detail-columns">
+                      <article className="detail-main">
                         <FactsTabs
                           link={link}
                           owner={owner}
@@ -600,70 +937,73 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
                           tab={tab}
                           onTab={setTab}
                           tabsRef={factsRef}
-                          overview={
+                          lead={
                             <>
-                              {link.summary && <p className="detail-summary">{link.summary}</p>}
-                              {link.snippet && (
+                              {link.status === 'failed' ? (
+                                <p className="hint-box warn" title={link.error || undefined}>
+                                  <CircleAlert size={16} aria-hidden="true" /> The robot couldn’t read this page. It will try again on its own later.
+                                </p>
+                              ) : null}
+                              {link.snippet ? (
                                 <p className="detail-match" title="Where your search words appear">
                                   <Search size={15} aria-hidden="true" />
                                   <span>
                                     <Highlight text={link.snippet} />
                                   </span>
                                 </p>
-                              )}
-                              {link.useFor && <p className="detail-use">{link.useFor}</p>}
-                              {owner && link.aiStatus === 'basic' && !isWorking(link) && (
-                                <p className="hint-box">This is a basic description from the page. Add a free Groq key to get AI summaries.</p>
-                              )}
-                              {link.aiStatus === 'pending' && !isWorking(link) && (
-                                <p className="hint-box">The free AI is resting. A better summary will be added automatically later.</p>
-                              )}
-                              {link.status === 'failed' && (
-                                <p className="hint-box warn" title={link.error || undefined}>
-                                  <CircleAlert size={16} aria-hidden="true" /> The robot couldn’t read this page. It will try again on its own later.
+                              ) : null}
+                              {link.useFor ? (
+                                <p className="detail-use">
+                                  <Lightbulb size={16} aria-hidden="true" />
+                                  <span>{link.useFor}</span>
                                 </p>
-                              )}
-                              {link.health === 'broken' && (
-                                <p className="hint-box warn">
-                                  <Unlink size={16} aria-hidden="true" /> The page seems to be gone.
-                                </p>
-                              )}
-
-                              {link.note && (
+                              ) : null}
+                              {link.note ? (
                                 <Section title="Your note">
                                   <p className="detail-note">{link.note}</p>
                                 </Section>
-                              )}
+                              ) : null}
+                            </>
+                          }
+                          overview={
+                            <>
+                              {owner && link.aiStatus === 'basic' && !isWorking(link) ? (
+                                <p className="hint-box">This is a basic description from the page. Add a free Groq key to get AI summaries.</p>
+                              ) : null}
+                              {link.aiStatus === 'pending' && !isWorking(link) ? (
+                                <p className="hint-box">The free AI is resting. A better summary will be added automatically later.</p>
+                              ) : null}
 
-                              {link.tasks.length > 0 && (
+                              {link.tasks.length > 0 ? (
                                 <Section title="What you can do with it">
                                   <ul className="detail-tasks">
                                     {link.tasks.map((task, index) => (
                                       <li key={`${index}-${task}`}>
-                                        <ArrowRight size={15} aria-hidden="true" /> {task.charAt(0).toUpperCase() + task.slice(1)}
+                                        <ArrowRight size={15} aria-hidden="true" /> <span>{task.charAt(0).toUpperCase() + task.slice(1)}</span>
                                       </li>
                                     ))}
                                   </ul>
                                 </Section>
-                              )}
+                              ) : null}
 
-                              {link.features.length > 0 && (
+                              {link.features.length > 0 ? (
                                 <Section title="Key features">
                                   <ShortList
                                     key={link.id}
+                                    id={`detail-features-${link.id}`}
                                     items={link.features}
                                     shown={SHOWN_FEATURES}
                                     className="detail-features"
                                     render={(feature, index) => (
                                       <li key={`${index}-${feature}`}>
-                                        <Check size={16} aria-hidden="true" /> {feature}
+                                        <Check size={16} aria-hidden="true" /> <span>{feature}</span>
                                       </li>
                                     )}
                                   />
                                 </Section>
-                              )}
+                              ) : null}
 
-                              {link.quickStart?.length > 0 && (
+                              {link.quickStart?.length > 0 ? (
                                 <Section title="Quick start">
                                   <ol className="detail-steps">
                                     {link.quickStart.map((step, index) => (
@@ -671,208 +1011,174 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
                                     ))}
                                   </ol>
                                 </Section>
-                              )}
+                              ) : null}
 
-                              {(link.overview || link.audience) && (
+                              {link.overview || link.audience ? (
                                 <Section title="In more detail">
-                                  {link.overview && <p className="detail-overview">{link.overview}</p>}
-                                  {link.audience && (
+                                  {link.overview ? <p className="detail-overview">{link.overview}</p> : null}
+                                  {link.audience ? (
                                     <p className="detail-audience">
                                       <strong>Who it’s for:</strong> {link.audience}
                                     </p>
-                                  )}
+                                  ) : null}
                                 </Section>
-                              )}
+                              ) : null}
                             </>
                           }
                         />
-                      </>
-                    )}
-                  </>
-                ) : detail.isError ? (
-                  <div className="detail-error" role="alert">
-                    <CircleAlert size={22} aria-hidden="true" />
-                    <p>{detail.error.message}</p>
-                    <button type="button" className="btn btn-ghost" onClick={close}>
-                      Close
-                    </button>
-                  </div>
-                ) : (
-                  <Skeleton />
-                )}
-              </article>
+                      </article>
 
-              <aside className="detail-side" ref={sideRef} aria-label="Related">
-                {link ? (
-                  <>
-                    <Section
-                      title="Similar in your library"
-                      action={
-                        similar.length > 0 && (
-                          <button
-                            type="button"
-                            className="detail-compare-all"
-                            onClick={() => leave(() => onCompare([link.id, ...similar.slice(0, MAX_COMPARE - 1).map(other => other.id)]))}
-                            title="See this link and the similar ones side by side"
-                          >
-                            <Columns3 size={14} aria-hidden="true" /> Compare all
-                          </button>
-                        )
-                      }
-                    >
-                      {similar.length > 0 ? (
-                        <ul className="detail-similar">
-                          {similar.map(other => (
-                            <li key={other.id} style={hueOf(other.category)}>
-                              <button type="button" onClick={() => go(other.id)} title={other.title}>
-                                <SiteIcon link={other} />
-                                <span className="detail-similar-text">
-                                  <strong>{other.title}</strong>
-                                  <span>{other.summary || other.description || hostOf(other.url)}</span>
-                                </span>
-                                <ChevronRight size={16} aria-hidden="true" className="detail-similar-go" />
-                              </button>
-                              {/* A sibling of the row (not inside it): a button can't hold another button. */}
+                      <aside className="detail-side" ref={sideRef} aria-label="Related">
+                        {owner ? (
+                          <div className="detail-status-row">
+                            <span>Your status</span>
+                            <MyStatus link={link} owner={owner} />
+                          </div>
+                        ) : null}
+
+                        <Section
+                          title="Similar in your library"
+                          action={
+                            similar.length > 0 ? (
                               <button
                                 type="button"
-                                className="detail-similar-compare"
-                                onClick={() => leave(() => onCompare([link.id, other.id]))}
-                                aria-label={`Compare ${link.title} with ${other.title}`}
-                                title={`Compare with ${other.title}`}
+                                className="detail-compare-all"
+                                onClick={() => compareThis([link.id, ...similar.slice(0, MAX_COMPARE - 1).map(other => other.id)])}
+                                title="See this link and the similar ones side by side"
                               >
-                                <Columns3 size={15} aria-hidden="true" />
+                                Compare all
                               </button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : similarLoading ? (
-                        <Skeleton side />
-                      ) : (
-                        <p className="detail-empty">Nothing similar saved yet.</p>
-                      )}
-                    </Section>
+                            ) : null
+                          }
+                        >
+                          {similar.length > 0 ? (
+                            <ul className="detail-similar">
+                              {similar.map(other => (
+                                <li key={other.id} style={hueOf(other.category)}>
+                                  <button type="button" className="detail-similar-row" onClick={() => go(other.id)} title={other.title}>
+                                    <SiteIcon link={other} />
+                                    <span className="detail-similar-text">
+                                      <strong>{other.title}</strong>
+                                      <span>{other.summary || other.description || hostOf(other.url)}</span>
+                                    </span>
+                                  </button>
+                                  {/* A sibling of the row (not inside it): a button can't hold another button. */}
+                                  <button
+                                    type="button"
+                                    className="detail-similar-compare"
+                                    onClick={() => compareThis([link.id, other.id])}
+                                    aria-label={`Compare ${link.title} with ${other.title}`}
+                                    title={`Compare with ${other.title}`}
+                                  >
+                                    <Columns3 size={15} aria-hidden="true" />
+                                  </button>
+                                </li>
+                              ))}
+                            </ul>
+                          ) : similarLoading ? (
+                            <SimilarSkeleton />
+                          ) : (
+                            <p className="detail-empty">Nothing similar saved yet.</p>
+                          )}
+                        </Section>
 
-                    {link.tags.length > 0 && (
-                      <Section title="Tags">
-                        <div className="detail-tags">
-                          {link.tags.map(tag => (
-                            <button key={tag} type="button" className="detail-tag" onClick={() => leave(() => onTag(tag))} title={`All links tagged ${tag}`}>
-                              #{tag}
-                            </button>
-                          ))}
-                        </div>
-                      </Section>
-                    )}
-
-                    <Section title="Details">
-                      <dl className="detail-facts">
-                        <dt>Added</dt>
-                        <dd>
-                          <time dateTime={link.createdAt}>{exactTime(link.createdAt)}</time>
-                        </dd>
-                        {link.collection && (
-                          <>
-                            <dt>Collection</dt>
-                            <dd>
-                              <Folder size={14} aria-hidden="true" /> {link.collection}
-                            </dd>
-                          </>
-                        )}
-                        {link.siteName && (
-                          <>
-                            <dt>Website</dt>
-                            <dd>{link.siteName}</dd>
-                          </>
-                        )}
-                        {link.opens > 0 && (
-                          <>
-                            <dt>Opened</dt>
-                            <dd>
-                              {times(link.opens)}
-                              {link.openedAt && `, last ${timeAgo(link.openedAt)}`}
-                            </dd>
-                          </>
-                        )}
-                        {link.github && (
-                          <>
-                            <dt>GitHub</dt>
-                            <dd>
-                              <span>
-                                <Star size={14} aria-hidden="true" /> {compactNumber(link.github.stars)} stars
-                                {link.github.language && ` · ${link.github.language}`}
-                                {link.github.license && ` · ${link.github.license}`}
-                              </span>
-                              {link.github.pushedAt && <span className="detail-sub">Updated {timeAgo(link.github.pushedAt)}</span>}
-                            </dd>
-                          </>
-                        )}
-                      </dl>
-                    </Section>
-
-                    {hasMore && (
-                      <details key={link.id} className="detail-more">
-                        <summary>
-                          More <ChevronDown size={16} aria-hidden="true" />
-                        </summary>
-                        {link.pageLinks?.length > 0 && (
-                          <Section title="Important links">
-                            <div className="detail-page-links">
-                              {link.pageLinks.map((item, index) => (
-                                <a key={`${index}-${item.url}`} href={item.url} target="_blank" rel="noopener noreferrer">
-                                  {item.label} <ExternalLink size={13} aria-hidden="true" />
-                                </a>
+                        {link.tags.length > 0 ? (
+                          <Section title="Tags">
+                            <div className="detail-tags">
+                              {link.tags.map(tag => (
+                                <button key={tag} type="button" className="detail-tag" onClick={() => leave(() => onTag(tag))} title={`All links tagged ${tag}`}>
+                                  #{tag}
+                                </button>
                               ))}
                             </div>
                           </Section>
-                        )}
-                        {headings.length > 0 && (
-                          <Section title="What’s on the website">
-                            <ShortList
-                              items={headings}
-                              shown={SHOWN_HEADINGS}
-                              className="detail-headings"
-                              render={(heading, index) => <li key={`${index}-${heading}`}>{heading}</li>}
-                            />
-                          </Section>
-                        )}
-                        {link.pagesRead?.length > 0 && (
-                          <Section title="Pages read">
-                            <div className="detail-pages">
-                              {link.pagesRead.map((page, index) => (
-                                <a key={`${index}-${page.url}`} href={page.url} target="_blank" rel="noopener noreferrer">
-                                  <FileText size={13} aria-hidden="true" /> {page.label || page.title || hostOf(page.url)}
-                                </a>
-                              ))}
-                            </div>
-                          </Section>
-                        )}
-                        {link.searchWords?.length > 0 && (
-                          <Section title="Also found by">
-                            <p className="detail-words">{link.searchWords.join(', ')}</p>
-                          </Section>
-                        )}
-                      </details>
-                    )}
-                  </>
-                ) : (
-                  <Skeleton side />
-                )}
-              </aside>
+                        ) : null}
+
+                        <Section title="Details">
+                          <dl className="detail-facts">
+                            <dt>Added</dt>
+                            <dd>
+                              <time dateTime={link.createdAt}>{exactTime(link.createdAt)}</time>
+                            </dd>
+                            {link.collection ? (
+                              <>
+                                <dt>Collection</dt>
+                                <dd>
+                                  <Folder size={14} aria-hidden="true" /> {link.collection}
+                                </dd>
+                              </>
+                            ) : null}
+                            {link.siteName ? (
+                              <>
+                                <dt>Website</dt>
+                                <dd>{link.siteName}</dd>
+                              </>
+                            ) : null}
+                            {link.opens > 0 ? (
+                              <>
+                                <dt>Opened</dt>
+                                <dd>
+                                  {times(link.opens)}
+                                  {link.openedAt ? `, last ${timeAgo(link.openedAt)}` : ''}
+                                </dd>
+                              </>
+                            ) : null}
+                            {link.github ? (
+                              <>
+                                <dt>GitHub</dt>
+                                <dd>
+                                  <span>
+                                    <Star size={14} aria-hidden="true" /> {compactNumber(link.github.stars)} stars
+                                    {link.github.language ? ` · ${link.github.language}` : ''}
+                                    {link.github.license ? ` · ${link.github.license}` : ''}
+                                  </span>
+                                  {link.github.pushedAt ? <span className="detail-sub">Updated {timeAgo(link.github.pushedAt)}</span> : null}
+                                </dd>
+                              </>
+                            ) : null}
+                          </dl>
+                        </Section>
+
+                        {hasMore ? <MoreDetails key={link.id} link={link} headings={headings} /> : null}
+                      </aside>
+                    </div>
+                  )}
+                </>
+              ) : detail.isError ? (
+                <div className="detail-error" role="alert">
+                  <CircleAlert size={22} aria-hidden="true" />
+                  <p>{detail.error.message}</p>
+                  <button type="button" className="btn btn-ghost" onClick={close}>
+                    Close
+                  </button>
+                </div>
+              ) : (
+                <Skeleton />
+              )}
             </div>
+
+            {/* Phones: the main actions stay under your thumb. (The same ones sit in the top bar on bigger screens.) */}
+            {link && !editing ? (
+              <div className="detail-dock">
+                <OpenWebsite link={link} owner={owner} />
+                <FavoriteButton link={link} owner={owner} className="icon-btn" />
+                <CompareToggle link={link} onCompare={compareThis} />
+              </div>
+            ) : null}
           </div>
 
           {/* On wide screens the arrows also float outside the window, like a photo viewer.
               The ones in the top bar do the same job for the keyboard and screen readers. */}
-          {hasNav && (
+          {hasNav ? (
             <>
               <button type="button" className="detail-float detail-float-prev" onClick={() => go(previous)} disabled={!previous} aria-hidden="true" tabIndex={-1}>
-                <ChevronLeft size={26} />
+                <ChevronLeft size={24} />
               </button>
               <button type="button" className="detail-float detail-float-next" onClick={() => go(next)} disabled={!next} aria-hidden="true" tabIndex={-1}>
-                <ChevronRight size={26} />
+                <ChevronRight size={24} />
               </button>
             </>
-          )}
+          ) : null}
         </>
       ) : null}
     </dialog>

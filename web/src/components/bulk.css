@@ -1,5 +1,5 @@
-/* The selection bar (BulkBar.jsx). It sits bottom-center and stays under 720px wide, so it never
-   runs into the toasts at the bottom right. The base .bulk-* rules live in styles.css; these refine them. */
+/* The selection bar (BulkBar.jsx). It sits bottom-center and stays under 720px wide. The toasts move up above it
+   (below), so they never cover it. The base .bulk-* rules live in styles.css; these refine them. */
 
 .bulk-bar {
   gap: 8px 12px;
@@ -46,6 +46,17 @@
 .bulk-select-all {
   font-size: 13.5px;
   white-space: nowrap;
+}
+
+/* "Selecting…" while the server sends the ids of every link in the view */
+.bulk-select-all .spin {
+  margin-right: 3px;
+  vertical-align: -2px;
+}
+
+.bulk-select-all:disabled {
+  color: var(--muted);
+  cursor: default;
 }
 
 .bulk-bar .bulk-actions .btn {
@@ -97,6 +108,65 @@
   margin-left: 2px;
 }
 
+/* A big change on its way: what it's doing in words, and a line that keeps moving along the top of the bar. */
+.bulk-working {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 8px;
+  margin: 0;
+  padding: 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.bulk-working-note {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.bulk-bar.is-working {
+  overflow: hidden;
+}
+
+.bulk-bar.is-working::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent) no-repeat;
+  background-size: 40% 100%;
+  animation: bulk-moving 1.3s ease-in-out infinite;
+}
+
+@keyframes bulk-moving {
+  from {
+    background-position: -70% 0;
+  }
+
+  to {
+    background-position: 170% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bulk-bar.is-working::before {
+    animation: none;
+    background-size: 100% 100%;
+  }
+}
+
+.bulk-bar .bulk-done:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* The toasts stand above the bar while it's there. */
+body:has(.bulk-bar) .toasts {
+  bottom: 92px;
+}
+
 @media (hover: hover) {
   .bulk-bar .bulk-actions .btn:hover:not(:disabled) {
     background: var(--surface-2);
@@ -110,6 +180,13 @@
   }
 }
 
+/* A narrow window: the bar may wrap to two rows. */
+@media (max-width: 800px) {
+  body:has(.bulk-bar) .toasts {
+    bottom: 136px;
+  }
+}
+
 /* Phones: the count and Done on top, three actions in one row under them (styles.css lays this out). */
 @media (max-width: 640px) {
   .bulk-bar {
@@ -117,6 +194,13 @@
     padding: 10px 12px;
     bottom: 8px;
     animation: none;
+  }
+
+  .bulk-working {
+    order: 2;
+    flex-basis: 100%;
+    min-height: 50px;
+    padding: 0 2px;
   }
 
   .bulk-count {

@@ -1,0 +1,329 @@
+/* "Where your tools come from" (where.jsx): the globe, the list of countries, and the place of a country's profile.
+   Narrow card (phones, tablets): the globe, then the profile as a sheet, then the list. Wide card: the globe on the left
+   and the list on the right, both one fixed height; the profile slides in over the list, so nothing on the page moves. */
+
+.where-body {
+  --where-height: 560px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.where-map {
+  position: relative;
+  min-width: 0;
+  height: clamp(346px, calc(62cqw + 46px), 460px);
+}
+
+/* The flat map, on a computer that can't draw the 3D Earth: in the middle of its place. */
+.where-map:has(> .world-map) {
+  display: grid;
+  align-items: center;
+  height: auto;
+}
+
+/* No countries yet: a small card over the globe says what will happen. */
+.where-map-note {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 2;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  width: min(380px, 86%);
+  padding: 16px 20px;
+  transform: translate(-50%, -50%);
+  background: color-mix(in oklab, var(--surface) 90%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  text-align: center;
+  color: var(--text-2);
+  font-size: 14px;
+  backdrop-filter: blur(3px);
+}
+
+.where-map-note svg {
+  color: var(--teal);
+}
+
+.where-map-note strong {
+  color: var(--text);
+  font-size: 15.5px;
+}
+
+.where-side {
+  position: relative;
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+
+.where-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.where-list-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.where-placed {
+  color: var(--muted);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* ---------- Find a country ---------- */
+
+.where-find {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 8px;
+  height: 38px;
+  padding: 0 6px 0 11px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--muted);
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.where-find:focus-within {
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.where-find input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.where-find input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+.where-find-clear {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--muted);
+}
+
+@media (hover: hover) {
+  .where-find-clear:hover {
+    background: var(--line);
+    color: var(--text);
+  }
+}
+
+/* ---------- The rows ---------- */
+
+.where-scroll {
+  min-height: 0;
+  margin: 8px -8px 0;
+  padding: 0 8px;
+}
+
+.where-rows {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.where-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 9px;
+  row-gap: 6px;
+  width: 100%;
+  padding: 7px 8px 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  text-align: left;
+  transition: background-color 0.12s;
+}
+
+@media (hover: hover) {
+  .where-row:hover {
+    background: var(--surface-2);
+  }
+
+  .where-row:hover .where-row-track {
+    background: var(--line);
+  }
+}
+
+.where-flag {
+  font-size: 16px;
+  line-height: 1;
+}
+
+.where-row-name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 550;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.where-row-count {
+  color: var(--text-2);
+  font-size: 13.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.where-row-track {
+  grid-column: 1 / -1;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--surface-2);
+}
+
+.where-row-fill {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+}
+
+.where-row.is-picked,
+.where-unknown.is-picked {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px color-mix(in oklab, var(--accent) 40%, var(--surface));
+}
+
+.where-more {
+  margin: 10px 0 2px 8px;
+}
+
+.where-none {
+  margin: 12px 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* "Not known yet" stays pinned under the list. */
+.where-unknown {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 9px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 8px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 9px 9px;
+  background: none;
+  color: var(--text-2);
+  font-size: 14px;
+  text-align: left;
+}
+
+.where-unknown-name {
+  flex: 1;
+  min-width: 0;
+  font-weight: 550;
+}
+
+.where-unknown-go {
+  flex: none;
+  margin-left: -4px;
+  color: var(--muted);
+}
+
+@media (hover: hover) {
+  .where-unknown:hover {
+    color: var(--text);
+    background: var(--surface-2);
+  }
+}
+
+/* ---------- A wide card: globe | list, one fixed height, and the profile over the list ---------- */
+
+@container (min-width: 820px) {
+  .where-body {
+    grid-template-columns: minmax(0, 1fr) minmax(320px, 388px);
+    gap: 24px;
+  }
+
+  .where-map,
+  .where-map:has(> .world-map) {
+    height: var(--where-height);
+  }
+
+  .where-side {
+    height: var(--where-height);
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  /* The list scrolls inside itself, thin scrollbar, soft edges where there is more. */
+  .where-list {
+    height: var(--where-height);
+  }
+
+  .where-scroll {
+    flex: 1;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line-strong) transparent;
+    --fade-top: 0px;
+    --fade-bottom: 0px;
+    -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+    mask-image: linear-gradient(to bottom, transparent 0, #000 var(--fade-top), #000 calc(100% - var(--fade-bottom)), transparent 100%);
+  }
+
+  .where-scroll[data-top='more'] {
+    --fade-top: 18px;
+  }
+
+  .where-scroll[data-bottom='more'] {
+    --fade-bottom: 26px;
+  }
+
+  .where-panel {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    --panel-from: translateX(16px);
+  }
+
+  /* The list stays where it is but can't be seen or reached under the profile. */
+  .where-body.is-open .where-list {
+    visibility: hidden;
+  }
+}

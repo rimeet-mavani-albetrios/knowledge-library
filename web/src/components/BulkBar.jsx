@@ -1,14 +1,23 @@
 // The bar at the bottom of the screen while you select links: add a tag to all of them, move them to a collection,
 // or delete them. Deleting asks first in our own window (never the browser's confirm()).
-import { useState } from 'react';
+// "Select all" picks every link in the view (its category, filters and order, or all the results of a search), also
+// the ones further down that aren't loaded yet: it asks the server for their ids, so the number on the button is the
+// real one, the same as "26 links found". Only "the nearest links" of a search that found nothing close has no such
+// number: there it picks the links shown.
+// A big change can take seconds (a tag on 1,000 links, say), so the bar says what it's doing until the answer comes.
+import { useEffect, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CircleAlert, Folder, Hash, LoaderCircle, Trash2, X } from 'lucide-react';
-import { api } from '../api.js';
+import { api, toQuery } from '../api.js';
+import { forgetLinks } from '../compare.js';
 import { useToast } from './Toasts.jsx';
 import { useConfirm } from './Confirm.jsx';
 import './bulk.css';
 
-const plural = (n, word) => `${n} ${n === 1 ? word : `${word}s`}`;
+const MAX_SELECT = 2000; // the most one "Select all" picks: the server's MAX_BULK (server/links.js)
+const BIG_CHANGE = 50; // from this many links a change can take a moment, so the bar says what it's doing
+const number = n => n.toLocaleString('en'); // 1,030
+const plural = (n, word) => `${number(n)} ${n === 1 ? word : `${word}s`}`;
 
 const DONE = {
   tag: n => `Tag added to ${plural(n, 'link')}`,
@@ -17,19 +26,45 @@ const DONE = {
   delete: n => `${plural(n, 'link')} deleted`,
 };
 
-// `ids` are the selected links; `allIds` the ones on screen, for "Select all".
-export default function BulkBar({ ids, allIds, onSelect, onDone }) {
+const WORKING = {
+  tag: n => `Adding the tag to ${plural(n, 'link')}…`,
+  collection: n => `Moving ${plural(n, 'link')}…`,
+  delete: n => `Deleting ${plural(n, 'link')}…`,
+};
+
+// `ids` are the selected links (also ones not loaded yet, after "Select all"); `shownIds` the ones on screen.
+// `view` is the list you see, { total, filters } (total is undefined while it loads), or null for the nearest links
+// of a search that found nothing close, where "Select all" picks the links shown.
+export default function BulkBar({ ids, shownIds, view, onSelect, onDone }) {
   const queryClient = useQueryClient();
   const toast = useToast();
   const confirm = useConfirm();
   const [step, setStep] = useState(null); // null | 'tag' | 'collection'
   const [value, setValue] = useState('');
   const [error, setError] = useState(''); // our own message under the small form
+  // What "Select all" was asked for must still be on screen when the ids arrive: the same filters, and the bar
+  // still open (Done pressed meanwhile means nothing should end up selected).
+  const viewKey = view ? JSON.stringify(view.filters) : '';
+  const [gatheringFor, setGatheringFor] = useState(null); // the view whose links are being asked for
+  const gathering = gatheringFor === viewKey; // (another view chosen meanwhile has its own "Select all" ready)
+  const latestView = useRef(viewKey);
+  latestView.current = viewKey;
+  const mounted = useRef(false);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+    };
+  }, []);
 
   const change = useMutation({
-    mutationFn: ({ action, value: text = '' }) => api('/links/bulk', { method: 'POST', body: { ids, action, value: text } }),
-    onSuccess: ({ changed }, { action }) => {
-      for (const key of ['links', 'link', 'facets', 'me', 'map']) queryClient.invalidateQueries({ queryKey: [key] });
+    // The links travel with the action, so the answer is about exactly the links that were sent.
+    mutationFn: ({ ids: chosen, action, value: text = '' }) => api('/links/bulk', { method: 'POST', body: { ids: chosen, action, value: text } }),
+    onSuccess: ({ changed }, { ids: chosen, action }) => {
+      // Deleted links leave your compare picks and recent comparisons too.
+      if (action === 'delete') forgetLinks(chosen);
+      // Everything that shows these links, an open comparison and its website facts included.
+      for (const key of ['links', 'link', 'facets', 'me', 'map', 'compare', 'compare-facts']) queryClient.invalidateQueries({ queryKey: [key] });
       toast(DONE[action](changed));
       setStep(null);
       setValue('');
@@ -39,7 +74,45 @@ export default function BulkBar({ ids, allIds, onSelect, onDone }) {
   });
 
   const count = ids.length;
-  const all = count === allIds.length;
+  const known = !view || view.total !== undefined; // the view's number is here (not while a new filter loads)
+  const wanted = view ? Math.min(view.total ?? 0, MAX_SELECT) : shownIds.length; // how many "Select all" picks
+  const all = count > 0 && count >= wanted;
+  let selectLabel = `Select all ${number(shownIds.length)} shown`;
+  if (view) selectLabel = !known || !view.total ? 'Select all' : view.total > MAX_SELECT ? `Select first ${number(MAX_SELECT)}` : `Select all ${number(view.total)}`;
+  // What's on its way to the server (it stays with the action, also when the selection changes meanwhile).
+  const sent = change.isPending ? change.variables : null;
+  const working = sent && sent.ids.length >= BIG_CHANGE ? WORKING[sent.action](sent.ids.length) : '';
+
+  async function selectAll() {
+    if (all) {
+      onSelect(new Set());
+      return;
+    }
+    // The nearest links of a search, or a view whose links are all on screen already: nothing more to ask for.
+    if (!view || shownIds.length >= view.total) {
+      onSelect(new Set(shownIds));
+      return;
+    }
+    const asked = viewKey;
+    setGatheringFor(asked);
+    try {
+      const { ids: every, capped, max } = await api(`/links/ids?${toQuery(view.filters)}`);
+      if (!mounted.current || latestView.current !== asked) return; // that selection is gone meanwhile
+      onSelect(new Set(every));
+      if (capped) {
+        toast({
+          title: `Selected the first ${number(max)} links`,
+          description: 'That’s the most at once. Change these, then select the rest.',
+          tone: 'info',
+        });
+      }
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      if (mounted.current) setGatheringFor(current => (current === asked ? null : current));
+    }
+  }
+
   const ask = next => {
     setStep(next);
     setValue('');
@@ -53,7 +126,7 @@ export default function BulkBar({ ids, allIds, onSelect, onDone }) {
       setError('Type the tag to add.');
       return;
     }
-    change.mutate({ action: step, value: value.trim() });
+    change.mutate({ ids, action: step, value: value.trim() });
   }
 
   async function remove() {
@@ -64,20 +137,33 @@ export default function BulkBar({ ids, allIds, onSelect, onDone }) {
       confirmLabel: 'Delete',
       danger: true,
     });
-    if (yes) change.mutate({ action: 'delete' });
+    if (yes) change.mutate({ ids, action: 'delete' });
   }
 
   return (
-    <div className="bulk-bar" role="region" aria-label="Selected links">
+    <div className={`bulk-bar${working ? ' is-working' : ''}`} role="region" aria-label="Selected links">
       <p className="bulk-count" aria-live="polite">
-        <span className="bulk-number">{count}</span>
+        <span className="bulk-number">{number(count)}</span>
         <span className="bulk-word">selected</span>
-        <button type="button" className="link-btn bulk-select-all" onClick={() => onSelect(new Set(all ? [] : allIds))}>
-          {all ? 'Clear' : `Select all ${allIds.length}`}
+        <button type="button" className="link-btn bulk-select-all" onClick={selectAll} disabled={gathering || Boolean(sent) || !known || (!all && !wanted)}>
+          {gathering ? (
+            <>
+              <LoaderCircle size={14} className="spin" aria-hidden="true" /> Selecting…
+            </>
+          ) : all ? (
+            'Clear'
+          ) : (
+            selectLabel
+          )}
         </button>
       </p>
 
-      {step ? (
+      {working ? (
+        <p className="bulk-working" role="status">
+          <LoaderCircle size={16} className="spin" aria-hidden="true" /> {working}
+          <span className="bulk-working-note">This can take a few seconds.</span>
+        </p>
+      ) : step ? (
         <form className="bulk-form" noValidate onSubmit={submit}>
           <div className="bulk-field">
             <label className="sr-only" htmlFor="bulk-value">
@@ -108,16 +194,16 @@ export default function BulkBar({ ids, allIds, onSelect, onDone }) {
             {change.isPending ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : null}
             {step === 'tag' ? 'Add tag' : 'Move'}
           </button>
-          <button type="button" className="icon-btn" aria-label="Cancel" title="Cancel" onClick={() => ask(null)}>
+          <button type="button" className="icon-btn" aria-label="Cancel" title="Cancel" disabled={change.isPending} onClick={() => ask(null)}>
             <X size={18} />
           </button>
         </form>
       ) : (
         <div className="bulk-actions">
-          <button type="button" className="btn btn-ghost" disabled={!count} onClick={() => ask('tag')}>
+          <button type="button" className="btn btn-ghost" disabled={!count || gathering || change.isPending} onClick={() => ask('tag')}>
             <Hash size={16} aria-hidden="true" /> Add tag
           </button>
-          <button type="button" className="btn btn-ghost" disabled={!count} onClick={() => ask('collection')}>
+          <button type="button" className="btn btn-ghost" disabled={!count || gathering || change.isPending} onClick={() => ask('collection')}>
             <Folder size={16} aria-hidden="true" /> Collection
           </button>
           {/* Hidden on 2026-10-28: a periodic background refresh is planned instead.
@@ -131,13 +217,13 @@ export default function BulkBar({ ids, allIds, onSelect, onDone }) {
             <RefreshCw size={16} aria-hidden="true" /> Read again
           </button>
           */}
-          <button type="button" className="btn btn-ghost bulk-delete" disabled={!count || change.isPending} onClick={remove}>
+          <button type="button" className="btn btn-ghost bulk-delete" disabled={!count || change.isPending || gathering} onClick={remove}>
             <Trash2 size={16} aria-hidden="true" /> Delete
           </button>
         </div>
       )}
 
-      <button type="button" className="btn btn-primary bulk-done" onClick={onDone}>
+      <button type="button" className="btn btn-primary bulk-done" disabled={change.isPending} onClick={onDone}>
         Done
       </button>
     </div>

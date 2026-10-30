@@ -1,4 +1,11 @@
 /* The "Stats" button in the top bar (Header.jsx). While the Stats page is open it looks pressed. */
+/* Also the ⋯ menu: in a short window its own lines scroll, so nothing falls off the bottom. */
+
+.menu {
+  max-height: calc(100dvh - var(--header-h) - 12px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
 
 .header-actions .btn.btn-stats[aria-pressed='true'] {
   border-color: color-mix(in oklab, var(--accent) 45%, var(--line));
@@ -7,6 +14,15 @@
 }
 
 @media (max-width: 640px) {
+  /* Phones: the ⋯ button sits far from the right side, so the menu hangs from the screen's edge instead of from the
+     button (hanging from the button, it ran off the left side). */
+  .menu {
+    position: fixed;
+    top: calc(var(--header-h) - 4px);
+    right: 16px;
+    max-width: calc(100vw - 32px);
+  }
+
   /* Phones: just the chart icon. */
   .header-actions .btn-stats {
     width: 40px;

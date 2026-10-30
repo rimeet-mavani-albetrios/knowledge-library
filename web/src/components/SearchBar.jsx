@@ -7,7 +7,7 @@ import { forwardRef, useEffect, useId, useLayoutEffect, useRef, useState } from 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ArrowRight, Clock, Hash, LoaderCircle, Search, X } from 'lucide-react';
 import { api, toQuery } from '../api.js';
-import { useDebounced, useRecentSearches, forgetSearch } from '../hooks.js';
+import { PHONE, useDebounced, useMediaQuery, useRecentSearches, forgetSearch } from '../hooks.js';
 import { hostOf } from '../format.js';
 import { SiteIcon } from './LinkCard.jsx';
 
@@ -162,6 +162,7 @@ const SearchBar = forwardRef(function SearchBar({ value, results, onSearch, onOp
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const listId = useId();
+  const phone = useMediaQuery(PHONE);
 
   // Follows the back button and example clicks, but keeps the space you just typed at the end.
   useEffect(() => setText(current => (current.trim() === value.trim() ? current : value)), [value]);
@@ -258,7 +259,8 @@ const SearchBar = forwardRef(function SearchBar({ value, results, onSearch, onOp
                 }
               }
             }}
-            placeholder={compact ? 'Search your library…' : 'What do you want to do? Like “convert pdf to excel”…'}
+            // On phones the whole sentence doesn't fit, and half a sentence looks broken.
+            placeholder={compact ? 'Search your library…' : phone ? 'What do you want to do?' : 'What do you want to do? Like “convert pdf to excel”…'}
             aria-label="Search your library"
             autoComplete="off"
             spellCheck="false"

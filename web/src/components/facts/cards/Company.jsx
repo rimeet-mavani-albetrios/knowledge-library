@@ -1,32 +1,61 @@
 // Who runs the website: the company from its own Privacy or Terms page (read by the free AI), plus when it was
-// founded, by whom and where, from Wikidata.
+// founded, by whom and where, from Wikidata. The country is the link's one country (the `place` fact, the same one
+// the filter and the world map use); when it was borrowed or guessed, a quiet note says from where.
 import { Building2, MapPin, ExternalLink } from 'lucide-react';
-import { countryName, flag } from '../places.js';
+import Flag from '../../Flag.jsx';
+import { countryName, countryOf, countrySource } from '../places.js';
+import './company.css';
 
 export const tab = 'company';
 export const order = 10;
 
-const place = (city, country) => [city, countryName(country)].filter(Boolean).join(', ');
+// Sources the card's last line already names ("From the website's own legal pages and Wikidata").
+const NAMED_BELOW = new Set(['company', 'wikidata']);
 
 export function glance(facts) {
-  const country = facts.company?.country || facts.wikidata?.country;
+  const country = countryOf(facts);
   if (!country) return null;
-  return { icon: MapPin, text: `${flag(country)} ${countryName(country, { short: true })}`.trim(), tab: 'company' };
+  return {
+    icon: MapPin,
+    label: 'Country',
+    value: (
+      <>
+        <Flag code={country} /> {countryName(country, { short: true })}
+      </>
+    ),
+    rank: 40,
+    tab: 'company',
+  };
 }
 
 export default function Company({ facts }) {
   const company = facts.company ?? {};
   const wiki = facts.wikidata ?? {};
   const name = company.name || wiki.name;
-  const country = company.country || wiki.country;
-  const city = company.city || wiki.city;
+  const country = countryOf(facts);
+  // A city only goes with the country it was found with (amazon.in's legal page names Bengaluru, but the link's
+  // country is Amazon's own).
+  const sameCountry = code => !code || String(code).toUpperCase() === country;
+  const city = (sameCountry(company.country) && company.city) || (sameCountry(wiki.country) && wiki.city) || '';
+  const note = NAMED_BELOW.has(facts.place?.source) ? '' : countrySource(facts.place);
   const policy = company.policy ?? {};
   const rows = [
     name && ['Company', name],
-    (city || country) && ['Based in', `${flag(country)} ${place(city, country)}`.trim()],
+    (city || country) && [
+      'Based in',
+      <>
+        <Flag code={country} /> {[city, countryName(country)].filter(Boolean).join(', ')}
+        {note ? <span className="fact-where-from"> · {note}</span> : null}
+      </>,
+    ],
     wiki.founded && ['Founded', String(wiki.founded)],
     wiki.founders?.length && ['Founders', wiki.founders.join(', ')],
-    company.dataRegion && ['Your data is kept in', `${flag(company.dataRegion)} ${countryName(company.dataRegion)}`.trim()],
+    company.dataRegion && [
+      'Your data is kept in',
+      <>
+        <Flag code={company.dataRegion} /> {countryName(company.dataRegion)}
+      </>,
+    ],
   ].filter(Boolean);
   const pages = [policy.privacy && ['Privacy policy', policy.privacy], policy.terms && policy.terms !== policy.privacy && ['Terms', policy.terms]].filter(Boolean);
   if (!rows.length && !pages.length) return null;
@@ -67,4 +96,3 @@ export default function Company({ facts }) {
     </section>
   );
 }
-

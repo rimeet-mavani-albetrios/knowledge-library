@@ -1,0 +1,149 @@
+/* The map's own colors, for the Explore page and the small map on the home page: a pastel paper chart in the light theme,
+   a deep, rich chart (not neon) in the dark theme. */
+:root {
+  --atlas-sea: #dbe5f1;
+  --atlas-shore: #e8eff8;
+  --atlas-grid: rgb(62 84 128 / 0.1);
+  --atlas-land: #fbf8f1;
+  --atlas-coast: #7f8ca6;
+  --atlas-border: rgb(255 255 255 / 0.92);
+  --atlas-contour: rgb(38 48 78 / 0.11);
+  --atlas-halo: rgb(255 255 255 / 0.9);
+  --atlas-ring: #ffffff;
+  --atlas-plate: #ffffff;
+}
+
+:root[data-theme='dark'] {
+  --atlas-sea: #0d131f;
+  --atlas-shore: #1b2a44;
+  --atlas-grid: rgb(142 172 222 / 0.07);
+  --atlas-land: #1c2331;
+  --atlas-coast: #566a8c;
+  --atlas-border: rgb(9 13 21 / 0.85);
+  --atlas-contour: rgb(255 255 255 / 0.075);
+  --atlas-halo: rgb(14 19 29 / 0.92);
+  --atlas-ring: #0b1019;
+  --atlas-plate: #f7f8fa;
+}
+
+/* The small map on the home page: a tiny atlas, with the same land as the Explore page. */
+.map .map-frame {
+  background-color: var(--atlas-sea);
+  background-image: radial-gradient(ellipse at 50% 50%, color-mix(in oklab, var(--atlas-shore) 55%, transparent), transparent 70%);
+  background-size: auto;
+}
+
+.map-land path {
+  fill-rule: evenodd;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-land {
+  transition: opacity 0.25s;
+}
+
+.map.is-narrowed .map-land {
+  opacity: 0.6;
+}
+
+.map-land-base {
+  fill: var(--atlas-land);
+}
+
+.map-country {
+  fill: color-mix(in oklab, var(--hue) 32%, var(--atlas-land));
+  stroke: var(--atlas-border);
+  stroke-width: 0.7px;
+}
+
+.map-land-coast {
+  fill: none;
+  stroke: var(--atlas-coast);
+  stroke-width: 0.9px;
+}
+
+/* The dots: lines of no length with round ends (see KnowledgeMap.jsx), on a thin outline shape. */
+.map-dots,
+.map-dots-outline {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.map-dots {
+  stroke: var(--hue);
+}
+
+.map-dots-outline {
+  stroke: var(--atlas-ring);
+  stroke-opacity: 0.85;
+}
+
+.map .map-label {
+  stroke: var(--atlas-halo);
+}
+
+.map .map-core {
+  stroke: var(--atlas-ring);
+  stroke-width: 0.9px;
+  vector-effect: non-scaling-stroke;
+}
+
+.map .map-frame:has(.map-land) figcaption {
+  background: color-mix(in oklab, var(--surface) 90%, transparent);
+}
+
+/* The home map's way into the Explore page (KnowledgeMap.jsx): a button in the corner, and a "zoom in" pointer
+   over the map's empty space (a click there opens Explore too). */
+
+.map.can-explore .map-frame > svg {
+  cursor: zoom-in;
+}
+
+.map.can-explore .map-frame > svg.is-pointing {
+  cursor: pointer;
+}
+
+.map-explore {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--surface) 90%, transparent);
+  -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(6px);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: border-color 0.15s, background-color 0.15s, transform 0.15s;
+}
+
+.map-explore svg {
+  color: var(--accent);
+}
+
+@media (hover: hover) {
+  .map-explore:hover {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    color: var(--accent-text);
+  }
+
+  /* Pointing at the map shows the button a little more, as a hint that there's more to see. */
+  .map-frame:hover .map-explore {
+    transform: translateY(-1px);
+  }
+}
+
+/* The lit dots are one shape per category (KnowledgeMap.jsx), so they fade in together instead of popping in one by one. */
+.map-lit .map-dot {
+  animation: territory-in 0.3s ease-out both;
+}

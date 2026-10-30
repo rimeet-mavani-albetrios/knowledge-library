@@ -96,6 +96,14 @@ export async function describeWithAi(info) {
   return parseAnswer(await chat(buildPrompt(info), 1500));
 }
 
+// Thrown when the AI's answer to "Which should I pick?" can't be used: not JSON, or a pick that isn't one of the
+// links. Guessing would put "Best pick" on a link the AI never chose, so the owner is asked to try again instead.
+export class AiUnclear extends Error {
+  constructor() {
+    super('The AI gave an unclear answer. Try again.');
+  }
+}
+
 // The compare window's "Which should I pick?": the AI reads 2 to 4 links side by side and picks one.
 // Answers { pickId, reason, others: [{ id, when }] }.
 export async function pickWithAi(links) {
@@ -138,9 +146,16 @@ Use only the facts above.`,
     600,
   );
   const content = response.choices?.[0]?.message?.content ?? '';
-  const answer = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
-  const at = number => links[Number(number) - 1];
-  const pick = at(answer.pick) ?? links[0];
+  let answer;
+  try {
+    answer = JSON.parse(content.slice(content.indexOf('{'), content.lastIndexOf('}') + 1));
+  } catch {
+    throw new AiUnclear();
+  }
+  // Only a whole number from 1 to the number of links is a link ("2" is fine; 0, 5 or 1.5 are not).
+  const at = number => (/^\d+$/.test(String(number ?? '').trim()) ? links[Number(number) - 1] : undefined);
+  const pick = at(answer?.pick);
+  if (!pick) throw new AiUnclear();
   return {
     pickId: pick.id,
     reason: clean(answer.reason).slice(0, 400),

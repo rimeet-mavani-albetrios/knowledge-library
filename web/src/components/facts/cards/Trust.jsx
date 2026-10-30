@@ -10,7 +10,7 @@ export const toneOfGrade = grade => (grade === 'A' || grade === 'B' ? 'good' : g
 export function glance(facts) {
   const grade = facts.trust?.grade;
   if (!grade) return null;
-  return { icon: toneOfGrade(grade) === 'good' ? ShieldCheck : ShieldAlert, text: `Trust ${grade}`, tab: 'trust', tone: toneOfGrade(grade) };
+  return { icon: toneOfGrade(grade) === 'good' ? ShieldCheck : ShieldAlert, label: 'Trust', value: grade, rank: 30, tab: 'trust', tone: toneOfGrade(grade) };
 }
 
 const SAYS = {
