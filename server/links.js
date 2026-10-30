@@ -22,6 +22,10 @@ const FIELDS = `id, url, title, description, summary, use_for, features, categor
   site_name, author, image_url, icon_url, github, note, collection, status, ai_status, error, health,
   created_at, updated_at, tasks, level, favorite, my_status, opens, opened_at`;
 const DETAIL_FIELDS = `${FIELDS}, overview, audience, quick_start, search_words, headings, page_links, pages_read`;
+// The small "Price went up" tag on boxes: the last time a plan's price rose, within 30 days (server/facts/kinds/prices.js).
+// Lists and search results ask for it; jsonb compares the two numbers, so an odd row can never break the list.
+const PRICE_UP = `(SELECT max(h.found_at) FROM link_history h WHERE h.link_id = links.id AND h.kind = 'price'
+  AND h.found_at > now() - interval '30 days' AND (h.data -> 'to') > (h.data -> 'from')) AS price_up_at`;
 const prefixed = (fields, table) => fields.replace(/(^|,\s*)(\w+)/g, `$1${table}.$2`);
 
 // Database row → what the website receives.
@@ -70,6 +74,7 @@ export function toLink(row) {
       pagesRead: row.pages_read ?? [],
     });
   }
+  if (row.price_up_at) link.priceUpAt = row.price_up_at;
   if ('best' in row) link.match = row.best ? 'best' : 'related';
   if (row.snippet) link.snippet = row.snippet;
   return link;
@@ -94,9 +99,21 @@ function filterSql(filters, params, skip = '') {
   if (filters.free && skip !== 'free') clauses.push(`pricing IN ('free', 'open-source', 'freemium')`);
   // Pages that seem to be gone, or that the robot couldn't read: the ones to fix or delete.
   if (filters.broken && skip !== 'broken') clauses.push(`(health = 'broken' OR status = 'failed')`);
+  // Facts the robot found about the website (link_facts): where the company is, and its trust grade.
+  if (filters.country === UNKNOWN_COUNTRY && skip !== 'country') {
+    clauses.push(`id NOT IN (SELECT link_id FROM link_facts WHERE ${COUNTRY_OF('link_facts')} IS NOT NULL)`);
+  } else if (filters.country && skip !== 'country') {
+    add(`id IN (SELECT link_id FROM link_facts WHERE ${COUNTRY_OF('link_facts')} = ?)`, filters.country);
+  }
+  if (filters.trust && skip !== 'trust') clauses.push(`id IN (SELECT link_id FROM link_facts WHERE facts #>> '{trust,grade}' IN ('A', 'B'))`);
   if (filters.ids) add('id = ANY(?)', filters.ids);
   return clauses;
 }
+
+// The country of the company behind a website: from its Terms page, else from Wikidata. Two-letter codes ("US").
+export const COUNTRY_OF = table =>
+  `upper(coalesce(nullif(${table}.facts #>> '{company,country}', ''), nullif(${table}.facts #>> '{wikidata,country}', '')))`;
+export const UNKNOWN_COUNTRY = 'unknown'; // the country filter's value for links whose country isn't known (yet)
 
 const whereOf = clauses => (clauses.length ? `WHERE ${clauses.join(' AND ')}` : '');
 
@@ -118,7 +135,16 @@ const OFFSET_SORTS = {
   opened: 'opened_at DESC NULLS LAST, created_at DESC, id',
   favorites: 'favorite DESC, created_at DESC, id',
 };
-export const SORTS = ['newest', 'oldest', ...Object.keys(OFFSET_SORTS)];
+// Orders that use the facts about each website, so link_facts is joined in (as `lf`). Links without the fact go last.
+// - Most popular: the smallest popularity bucket first ("top 1,000 websites" before "top 10,000").
+// - Best rated: the app's rating, pulled towards 4 when only a few people rated it (a "4.0 from 20 votes" head
+//   start), so a 5.0 from 3 people doesn't beat a 4.8 from 100,000.
+const FACT_SORTS = {
+  popular: `(lf.facts #>> '{popularity,bucket}')::numeric ASC NULLS LAST, links.opens DESC, links.created_at DESC, links.id`,
+  rated: `((lf.facts #>> '{app,ios,rating}')::numeric * coalesce((lf.facts #>> '{app,ios,ratings}')::numeric, 1) + 80)
+      / (coalesce((lf.facts #>> '{app,ios,ratings}')::numeric, 1) + 20) DESC NULLS LAST, links.opens DESC, links.created_at DESC, links.id`,
+};
+export const SORTS = ['newest', 'oldest', ...Object.keys(OFFSET_SORTS), ...Object.keys(FACT_SORTS)];
 
 export async function listLinks({ filters = {}, sort = 'newest', limit = settings.pageSize, cursor } = {}) {
   const params = [];
@@ -126,8 +152,15 @@ export async function listLinks({ filters = {}, sort = 'newest', limit = setting
   const after = decodeCursor(cursor);
   let order;
   let offset = 0;
+  let from = 'links';
+  let fields = FIELDS;
 
-  if (OFFSET_SORTS[sort]) {
+  if (FACT_SORTS[sort]) {
+    order = FACT_SORTS[sort];
+    offset = after?.offset ?? 0;
+    from = 'links LEFT JOIN link_facts AS lf ON lf.link_id = links.id';
+    fields = prefixed(FIELDS, 'links');
+  } else if (OFFSET_SORTS[sort]) {
     order = OFFSET_SORTS[sort];
     offset = after?.offset ?? 0;
   } else {
@@ -142,14 +175,15 @@ export async function listLinks({ filters = {}, sort = 'newest', limit = setting
 
   params.push(limit + 1, offset);
   const { rows } = await query(
-    `SELECT ${FIELDS} FROM links ${whereOf(clauses)} ORDER BY ${order} LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    `SELECT ${fields}, ${PRICE_UP} FROM ${from} ${whereOf(clauses)} ORDER BY ${order} LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params,
   );
   const items = rows.slice(0, limit).map(toLink);
   let nextCursor = null;
   if (rows.length > limit) {
     const last = rows[limit - 1];
-    nextCursor = encodeCursor(OFFSET_SORTS[sort] ? { offset: offset + limit } : { t: new Date(last.created_at).toISOString(), id: last.id });
+    const paged = OFFSET_SORTS[sort] || FACT_SORTS[sort];
+    nextCursor = encodeCursor(paged ? { offset: offset + limit } : { t: new Date(last.created_at).toISOString(), id: last.id });
   }
   return { items, nextCursor };
 }
@@ -278,7 +312,7 @@ export async function searchLinks({ q, vector, filters = {}, limit = settings.pa
       `${cte.with}
        SELECT page.*${any ? `, ts_headline('english', array_to_string(page.tasks, '. ') || '. ' || page.summary || ' ' || left(more.content, 10000), ${any}, '${HEADLINE}') AS snippet` : ''}
        FROM (
-         SELECT ${prefixed(FIELDS, 'links')}, found.best, found.score, count(*) OVER () AS total, count(*) FILTER (WHERE found.best) OVER () AS best_total
+         SELECT ${prefixed(FIELDS, 'links')}, ${PRICE_UP}, found.best, found.score, count(*) OVER () AS total, count(*) FILTER (WHERE found.best) OVER () AS best_total
          FROM found JOIN links ON links.id = found.id
          ORDER BY found.best DESC, found.score DESC, links.created_at DESC
          LIMIT $${params.length - 1} OFFSET $${params.length}
@@ -368,16 +402,23 @@ export async function facets({ q, vector, filters = {} }) {
     `SELECT 'favorites', '', count(*)::int FROM links ${where({ ...filters, favorite: true })}`,
     `SELECT 'broken', '', count(*)::int FROM links ${where({ ...filters, broken: true })}`,
     `SELECT 'total', '', count(*)::int FROM links ${where(filters)}`,
+    // From the facts about each website: the company's country, and how many have trust grade A or B.
+    `SELECT 'countries', ${COUNTRY_OF('lf')}, count(*)::int FROM links JOIN link_facts AS lf ON lf.link_id = links.id
+     ${where(filters, 'country')} GROUP BY 2 HAVING ${COUNTRY_OF('lf')} IS NOT NULL`,
+    `SELECT 'trusted', '', count(*)::int FROM links ${where({ ...filters, trust: true })}`,
   ];
   const { rows } = await query(`${cte ? cte.with : ''}\n${parts.join('\nUNION ALL\n')}`, params);
 
-  const result = { categories: [], sources: [], collections: [], levels: [], statuses: [], tags: [], free: 0, favorites: 0, broken: 0, total: 0 };
+  const result = {
+    categories: [], sources: [], collections: [], levels: [], statuses: [], tags: [], countries: [],
+    free: 0, favorites: 0, broken: 0, trusted: 0, total: 0,
+  };
   for (const { facet, value, count } of rows) {
     if (Array.isArray(result[facet])) result[facet].push({ value, count });
     else result[facet] = count;
   }
   // Most links first (the answer comes in no order); the same count by name.
-  for (const name of [...FACET_GROUPS.map(([name]) => name), 'tags']) {
+  for (const name of [...FACET_GROUPS.map(([name]) => name), 'tags', 'countries']) {
     result[name].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
   }
   return result;

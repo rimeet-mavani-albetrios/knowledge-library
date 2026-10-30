@@ -10,6 +10,10 @@ import { aiState, pickWithAi, AiPaused } from './robot/ai.js';
 import { exportLinks } from './export.js';
 import { libraryMap } from './map.js';
 import { fixSpelling } from './words.js';
+import { factsRoutes } from './routes/facts.js';
+import { stats } from './routes/stats.js';
+import { cron } from './routes/cron.js';
+import { email } from './routes/email.js';
 
 export const api = express.Router();
 const MAX_LINKS_PER_ADD = 1000;
@@ -54,6 +58,9 @@ function readFilters(q) {
     favorite: yes(q.favorite),
     free: yes(q.free),
     broken: yes(q.broken),
+    // From the facts about each website: the company's country ("US", or "unknown") and trust grade A or B.
+    country: /^[a-z]{2}$/i.test(pick(q.country)) ? q.country.toUpperCase() : q.country === links.UNKNOWN_COUNTRY ? q.country : '',
+    trust: yes(q.trust),
   };
 }
 
@@ -253,6 +260,11 @@ api.delete('/links/:id', requireOwner, async (req, res) => {
   if (!(await links.deleteLink(req.params.id))) return res.status(404).json({ error: 'This link is not in the library any more.' });
   res.json({ deleted: true });
 });
+
+api.use(factsRoutes); // website facts for the detail window's tabs (routes/facts.js)
+api.use(stats); // the Stats page and the compare window's website facts (routes/stats.js)
+api.use(cron); // POST /api/cron/daily: the daily wake-up (Phase 3)
+api.use(email); // the weekly email (routes/email.js)
 
 api.use((req, res) => res.status(404).json({ error: 'Unknown API address.' }));
 

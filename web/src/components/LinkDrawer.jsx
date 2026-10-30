@@ -17,6 +17,7 @@ import { useToast } from './Toasts.jsx';
 import { useConfirm } from './Confirm.jsx';
 import { patchLinks, useUpdateLink, useCountOpen } from '../hooks.js';
 import { MAX_COMPARE, togglePick, useComparePicks } from '../compare.js';
+import FactsTabs, { Glance, factsQuery, useLinkFacts } from './facts/FactsTabs.jsx';
 import {
   compactNumber, fullDate, hostOf, timeAgo, PRICING_LABELS, STATUS_LABELS, LEVEL_LABELS, MY_STATUS_LABELS, isWorking,
 } from '../format.js';
@@ -309,6 +310,9 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   const [copied, setCopied] = useState(false);
   const copyTimer = useRef(null);
   const shown = useRef(false); // a link was on screen during the last render
+  // The facts tab stays the same while you go through the results with the arrows, so you can compare them.
+  const [tab, setTab] = useState('overview');
+  const factsRef = useRef(null);
 
   const position = ids.indexOf(id);
   const previous = position > 0 ? ids[position - 1] : null;
@@ -330,6 +334,17 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
   useEffect(() => {
     shown.current = Boolean(id && link);
   });
+  const facts = useLinkFacts(id, owner);
+  // Only this link's facts: while the next link loads, the one on screen doesn't get its chips.
+  const factsData = link?.id === id ? facts.data : undefined;
+  useEffect(() => {
+    if (!id) setTab('overview');
+  }, [id]);
+  const pickTab = useCallback(to => {
+    setTab(to);
+    const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    factsRef.current?.scrollIntoView({ block: 'nearest', behavior: still ? 'auto' : 'smooth' });
+  }, []);
 
   useEffect(() => {
     if (position >= 0 && position >= ids.length - 3) onNearEnd?.();
@@ -360,6 +375,7 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
     for (const other of [next, previous]) {
       if (!other) continue;
       const query = detailQuery(other, q);
+      queryClient.prefetchQuery(factsQuery(other));
       queryClient.prefetchQuery(query).then(() => {
         const url = queryClient.getQueryData(query.queryKey)?.link.imageUrl;
         if (url) Object.assign(new Image(), { referrerPolicy: 'no-referrer', src: url });
@@ -541,6 +557,12 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
                           </span>
                           {link.opens > 0 && <span className="detail-when">Opened {times(link.opens)}</span>}
                         </p>
+                        <Glance
+                          link={link}
+                          data={factsData}
+                          loading={link.source === 'web' && (!factsData || factsData.collecting || (owner && factsData.pending.length > 0))}
+                          onPick={pickTab}
+                        />
 
                         <div className="detail-actions">
                           <a className="btn btn-primary" href={link.url} target="_blank" rel="noopener noreferrer" onClick={() => owner && countOpen(link.id)}>
@@ -571,87 +593,99 @@ export default function LinkDrawer({ id, q, owner, categories, ids = [], onClose
 
                         <MyStatus link={link} owner={owner} />
 
-                        {link.summary && <p className="detail-summary">{link.summary}</p>}
-                        {link.snippet && (
-                          <p className="detail-match" title="Where your search words appear">
-                            <Search size={15} aria-hidden="true" />
-                            <span>
-                              <Highlight text={link.snippet} />
-                            </span>
-                          </p>
-                        )}
-                        {link.useFor && <p className="detail-use">{link.useFor}</p>}
-                        {owner && link.aiStatus === 'basic' && !isWorking(link) && (
-                          <p className="hint-box">This is a basic description from the page. Add a free Groq key to get AI summaries.</p>
-                        )}
-                        {link.aiStatus === 'pending' && !isWorking(link) && (
-                          <p className="hint-box">The free AI is resting. A better summary will be added automatically later.</p>
-                        )}
-                        {link.status === 'failed' && (
-                          <p className="hint-box warn" title={link.error || undefined}>
-                            <CircleAlert size={16} aria-hidden="true" /> The robot couldn’t read this page. It will try again on its own later.
-                          </p>
-                        )}
-                        {link.health === 'broken' && (
-                          <p className="hint-box warn">
-                            <Unlink size={16} aria-hidden="true" /> The page seems to be gone.
-                          </p>
-                        )}
-
-                        {link.note && (
-                          <Section title="Your note">
-                            <p className="detail-note">{link.note}</p>
-                          </Section>
-                        )}
-
-                        {link.tasks.length > 0 && (
-                          <Section title="What you can do with it">
-                            <ul className="detail-tasks">
-                              {link.tasks.map((task, index) => (
-                                <li key={`${index}-${task}`}>
-                                  <ArrowRight size={15} aria-hidden="true" /> {task.charAt(0).toUpperCase() + task.slice(1)}
-                                </li>
-                              ))}
-                            </ul>
-                          </Section>
-                        )}
-
-                        {link.features.length > 0 && (
-                          <Section title="Key features">
-                            <ShortList
-                              key={link.id}
-                              items={link.features}
-                              shown={SHOWN_FEATURES}
-                              className="detail-features"
-                              render={(feature, index) => (
-                                <li key={`${index}-${feature}`}>
-                                  <Check size={16} aria-hidden="true" /> {feature}
-                                </li>
+                        <FactsTabs
+                          link={link}
+                          owner={owner}
+                          data={factsData}
+                          tab={tab}
+                          onTab={setTab}
+                          tabsRef={factsRef}
+                          overview={
+                            <>
+                              {link.summary && <p className="detail-summary">{link.summary}</p>}
+                              {link.snippet && (
+                                <p className="detail-match" title="Where your search words appear">
+                                  <Search size={15} aria-hidden="true" />
+                                  <span>
+                                    <Highlight text={link.snippet} />
+                                  </span>
+                                </p>
                               )}
-                            />
-                          </Section>
-                        )}
+                              {link.useFor && <p className="detail-use">{link.useFor}</p>}
+                              {owner && link.aiStatus === 'basic' && !isWorking(link) && (
+                                <p className="hint-box">This is a basic description from the page. Add a free Groq key to get AI summaries.</p>
+                              )}
+                              {link.aiStatus === 'pending' && !isWorking(link) && (
+                                <p className="hint-box">The free AI is resting. A better summary will be added automatically later.</p>
+                              )}
+                              {link.status === 'failed' && (
+                                <p className="hint-box warn" title={link.error || undefined}>
+                                  <CircleAlert size={16} aria-hidden="true" /> The robot couldn’t read this page. It will try again on its own later.
+                                </p>
+                              )}
+                              {link.health === 'broken' && (
+                                <p className="hint-box warn">
+                                  <Unlink size={16} aria-hidden="true" /> The page seems to be gone.
+                                </p>
+                              )}
 
-                        {link.quickStart?.length > 0 && (
-                          <Section title="Quick start">
-                            <ol className="detail-steps">
-                              {link.quickStart.map((step, index) => (
-                                <li key={`${index}-${step}`}>{step}</li>
-                              ))}
-                            </ol>
-                          </Section>
-                        )}
+                              {link.note && (
+                                <Section title="Your note">
+                                  <p className="detail-note">{link.note}</p>
+                                </Section>
+                              )}
 
-                        {(link.overview || link.audience) && (
-                          <Section title="Overview">
-                            {link.overview && <p className="detail-overview">{link.overview}</p>}
-                            {link.audience && (
-                              <p className="detail-audience">
-                                <strong>Who it’s for:</strong> {link.audience}
-                              </p>
-                            )}
-                          </Section>
-                        )}
+                              {link.tasks.length > 0 && (
+                                <Section title="What you can do with it">
+                                  <ul className="detail-tasks">
+                                    {link.tasks.map((task, index) => (
+                                      <li key={`${index}-${task}`}>
+                                        <ArrowRight size={15} aria-hidden="true" /> {task.charAt(0).toUpperCase() + task.slice(1)}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </Section>
+                              )}
+
+                              {link.features.length > 0 && (
+                                <Section title="Key features">
+                                  <ShortList
+                                    key={link.id}
+                                    items={link.features}
+                                    shown={SHOWN_FEATURES}
+                                    className="detail-features"
+                                    render={(feature, index) => (
+                                      <li key={`${index}-${feature}`}>
+                                        <Check size={16} aria-hidden="true" /> {feature}
+                                      </li>
+                                    )}
+                                  />
+                                </Section>
+                              )}
+
+                              {link.quickStart?.length > 0 && (
+                                <Section title="Quick start">
+                                  <ol className="detail-steps">
+                                    {link.quickStart.map((step, index) => (
+                                      <li key={`${index}-${step}`}>{step}</li>
+                                    ))}
+                                  </ol>
+                                </Section>
+                              )}
+
+                              {(link.overview || link.audience) && (
+                                <Section title="In more detail">
+                                  {link.overview && <p className="detail-overview">{link.overview}</p>}
+                                  {link.audience && (
+                                    <p className="detail-audience">
+                                      <strong>Who it’s for:</strong> {link.audience}
+                                    </p>
+                                  )}
+                                </Section>
+                              )}
+                            </>
+                          }
+                        />
                       </>
                     )}
                   </>

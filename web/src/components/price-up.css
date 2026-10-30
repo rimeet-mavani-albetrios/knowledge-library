@@ -1,0 +1,8 @@
+/* The price watch's tiny arrow inside a box's price tag (card, tile and row): a plan's price rose in the last 30 days. */
+.price-up {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 3px;
+  color: var(--warning);
+  vertical-align: -1px;
+}

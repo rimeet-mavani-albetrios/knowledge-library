@@ -1,0 +1,777 @@
+/* Website facts in the detail window (FactsTabs.jsx and ./cards): the "At a glance" chips, the tabs and the cards. */
+
+/* ---------- At a glance ---------- */
+
+.facts-glance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 28px; /* the empty row kept while facts load has the same height, so nothing under it jumps */
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.glance-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.glance-chip svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.glance-chip.is-good {
+  border-color: color-mix(in oklab, var(--success) 30%, var(--surface));
+  background: color-mix(in oklab, var(--success) 9%, var(--surface));
+  color: var(--success);
+}
+
+.glance-chip.is-warn {
+  border-color: color-mix(in oklab, var(--warning) 32%, var(--surface));
+  background: color-mix(in oklab, var(--warning) 10%, var(--surface));
+  color: var(--warning);
+}
+
+.glance-chip.is-bad {
+  border-color: color-mix(in oklab, var(--danger) 32%, var(--surface));
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.glance-chip:is(.is-good, .is-warn, .is-bad) svg {
+  color: inherit;
+}
+
+/* ---------- Tabs ---------- */
+
+.facts-box {
+  margin-top: 22px;
+}
+
+/* Underlined text tabs. They stay at the top of the column while you scroll a long tab. */
+.facts-tabs {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  gap: 24px;
+  margin: 0 -4px;
+  padding: 0 4px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.facts-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.facts-tab {
+  flex: none;
+  margin-bottom: -1px;
+  padding: 11px 0 9px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.facts-tab[aria-selected='true'] {
+  border-bottom-color: var(--accent);
+  color: var(--text);
+}
+
+.facts-tab:focus-visible {
+  outline-offset: -2px;
+  border-radius: 6px 6px 0 0;
+}
+
+.facts-panel {
+  padding-top: 4px;
+}
+
+/* A tab whose cards all had nothing to show: the box is empty, so the calm note under it shows instead. */
+.facts-cards:empty {
+  display: none;
+}
+
+.facts-cards:not(:empty) + .facts-empty {
+  display: none;
+}
+
+.facts-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.facts-checked {
+  margin: 14px 2px 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* ---------- Cards ---------- */
+
+.fact-card {
+  margin-top: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.fact-card-title {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.fact-muted {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.fact-source {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.fact-btn {
+  flex: none;
+  height: 34px;
+  padding: 0 12px;
+  font-size: 13.5px;
+  text-decoration: none;
+}
+
+.fact-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+
+.fact-list > div {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.fact-list dt {
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.fact-list dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.fact-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 14px;
+  font-size: 13.5px;
+}
+
+.fact-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.fact-lines {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fact-lines li {
+  display: flex;
+  gap: 10px;
+  line-height: 1.45;
+}
+
+.fact-lines svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--muted);
+}
+
+.fact-lines .is-ok svg {
+  color: var(--success);
+}
+
+.fact-lines .is-not svg {
+  color: var(--danger);
+}
+
+.fact-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fact-chips li {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ---------- Fit check (Overview) ---------- */
+
+.fit-check {
+  margin-top: 18px;
+  border-color: color-mix(in oklab, var(--accent) 22%, var(--line));
+  background: color-mix(in oklab, var(--accent-soft) 55%, var(--surface));
+}
+
+.fit-label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+.fit-row {
+  display: flex;
+  gap: 8px;
+}
+
+.fit-row .input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.fit-row .input[aria-invalid='true'] {
+  border-color: var(--danger);
+}
+
+.fit-row .btn {
+  flex: none;
+}
+
+.fit-check .field-error {
+  margin: 8px 0 0;
+  color: var(--danger);
+  font-size: 13.5px;
+}
+
+.fit-result {
+  --tone: var(--success);
+  display: flex;
+  gap: 16px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in oklab, var(--accent) 16%, var(--line));
+}
+
+.fit-result.is-warn {
+  --tone: var(--warning);
+}
+
+.fit-result.is-bad {
+  --tone: var(--danger);
+}
+
+.fit-score {
+  display: grid;
+  flex: none;
+  place-content: center;
+  width: 64px;
+  height: 64px;
+  border: 3px solid var(--tone);
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--tone);
+  text-align: center;
+  line-height: 1;
+}
+
+.fit-score strong {
+  font-family: var(--display);
+  font-size: 24px;
+}
+
+.fit-score span {
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.fit-text {
+  min-width: 0;
+}
+
+.fit-verdict {
+  margin: 2px 0 0;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.fit-reasons {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.fit-reasons li {
+  display: flex;
+  gap: 8px;
+}
+
+.fit-reasons svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--success);
+}
+
+.fit-watch {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0 0;
+  color: var(--text-2);
+  font-size: 14px;
+}
+
+.fit-watch svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--warning);
+}
+
+/* ---------- Popularity ---------- */
+
+.app-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.app-row + .app-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.app-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.app-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-rating {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.app-number {
+  font-family: var(--display);
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.app-stars {
+  display: inline-flex;
+  gap: 1px;
+  color: var(--line-strong);
+}
+
+.app-stars .is-full {
+  color: #e8a317;
+  fill: currentColor;
+}
+
+.app-stars .is-half {
+  color: #e8a317;
+  fill: color-mix(in oklab, #e8a317 45%, transparent);
+}
+
+.stars-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0 0 10px;
+  color: var(--muted);
+}
+
+.stars-now strong {
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 24px;
+}
+
+.stars-gain {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.stars-gain.is-up {
+  color: var(--success);
+}
+
+.stars-line {
+  display: block;
+  width: 100%;
+  height: 120px;
+  overflow: visible;
+}
+
+.stars-area {
+  fill: color-mix(in oklab, var(--accent) 12%, transparent);
+}
+
+.stars-stroke {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.stars-line circle {
+  fill: var(--surface);
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+/* ---------- Trust ---------- */
+
+.trust {
+  --tone: var(--success);
+}
+
+.trust.is-warn {
+  --tone: var(--warning);
+}
+
+.trust.is-bad {
+  --tone: var(--danger);
+}
+
+.trust-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.trust-grade {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: color-mix(in oklab, var(--tone) 14%, var(--surface));
+  color: var(--tone);
+  font-family: var(--display);
+  font-size: 30px;
+  font-weight: 800;
+}
+
+.trust-title {
+  font-size: 17px;
+}
+
+.trust-head .fact-muted {
+  margin: 2px 0 0;
+}
+
+.trust-reasons {
+  display: grid;
+  gap: 7px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trust-reasons li {
+  display: flex;
+  gap: 9px;
+  line-height: 1.45;
+}
+
+.trust-reasons svg {
+  flex: none;
+  margin-top: 3px;
+}
+
+.trust-reasons .is-ok svg {
+  color: var(--success);
+}
+
+.trust-reasons .is-not svg {
+  color: var(--danger);
+}
+
+.trackers-count {
+  margin: 0;
+}
+
+.trackers-count strong {
+  font-family: var(--display);
+  font-size: 20px;
+}
+
+/* ---------- History: look back ---------- */
+
+.look-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.look-head .fact-card-title {
+  margin: 0;
+}
+
+.look-year {
+  margin: 0 0 6px;
+}
+
+.look-year strong {
+  font-family: var(--display);
+  font-size: 22px;
+}
+
+.look-slider {
+  --thumb: 20px;
+  margin: 4px 0 12px;
+}
+
+.look-slider input {
+  display: block;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  background: none;
+  cursor: pointer;
+  appearance: none;
+}
+
+.look-slider input::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.look-slider input::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.look-slider input::-webkit-slider-thumb {
+  width: var(--thumb);
+  height: var(--thumb);
+  margin-top: -7px;
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+  appearance: none;
+}
+
+.look-slider input::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border: 3px solid var(--surface);
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.25);
+}
+
+.look-slider input:focus-visible {
+  outline: none;
+}
+
+.look-slider input:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 4px var(--accent-soft), 0 1px 4px rgb(0 0 0 / 0.25);
+}
+
+/* Each year sits right under the slider's stop for it. */
+.look-ticks {
+  position: relative;
+  height: 20px;
+  margin: 0 calc(var(--thumb) / 2);
+}
+
+.look-ticks button {
+  position: absolute;
+  left: calc(var(--at) * 100%);
+  transform: translateX(-50%);
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.look-ticks button.is-on {
+  color: var(--accent-text);
+  font-weight: 700;
+}
+
+/* Many years: only the first, the last and the chosen one keep their number; the others become dots. */
+.look-slider.is-dense .look-ticks button:not(.is-on, .is-end) span {
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  font-size: 0;
+  vertical-align: middle;
+}
+
+.look-frame {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.look-frame iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 0;
+  transform-origin: 0 0;
+  background: #fff;
+}
+
+.look-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  color: var(--muted);
+  font-size: 14px;
+}
+
+@media (hover: hover) {
+  .glance-chip:hover {
+    border-color: var(--line-strong);
+    color: var(--text);
+  }
+
+  .glance-chip:is(.is-good, .is-warn, .is-bad):hover {
+    border-color: currentColor;
+    color: inherit;
+  }
+
+  .facts-tab:hover {
+    color: var(--text);
+  }
+
+  .look-ticks button:hover {
+    color: var(--text);
+  }
+
+  .fact-links a:hover {
+    text-decoration: underline;
+  }
+}
+
+@media (max-width: 640px) {
+  /* All five tabs fit across a phone. */
+  .facts-tabs {
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .facts-tab {
+    font-size: 13.5px;
+  }
+
+  .fit-row {
+    flex-direction: column;
+  }
+
+  .fit-result {
+    gap: 12px;
+  }
+
+  .fit-score {
+    width: 54px;
+    height: 54px;
+  }
+
+  .fact-list > div {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .app-row,
+  .look-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

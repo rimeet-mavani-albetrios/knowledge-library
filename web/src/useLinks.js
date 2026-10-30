@@ -5,8 +5,10 @@ import { keepPreviousData, useInfiniteQuery, useQueryClient } from '@tanstack/re
 import { api, toQuery } from './api.js';
 
 export function linkFilters(params) {
-  const { q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort } = params;
-  return { q, exact: q ? exact : false, category, source, collection, tag, level, status, favorite, free, broken, sort: q ? '' : sort };
+  const { q, exact, category, source, collection, tag, level, status, favorite, free, broken, sort, country, trust } = params;
+  return {
+    q, exact: q ? exact : false, category, source, collection, tag, level, status, favorite, free, broken, sort: q ? '' : sort, country, trust,
+  };
 }
 
 function linksQuery(params) {

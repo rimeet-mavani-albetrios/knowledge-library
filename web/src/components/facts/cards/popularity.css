@@ -1,0 +1,200 @@
+/* The Popularity tab's cards: "Popular in" (Cloudflare Radar) and "On YouTube".
+   The card frame and title (.fact-card, .fact-card-title) come from ../facts.css; these are only the insides. */
+
+.fact-popular-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.fact-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.fact-source {
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.fact-countries-note {
+  margin: 0 0 6px;
+  color: var(--text-2);
+  font-size: 13px;
+}
+
+.fact-rising {
+  background: color-mix(in oklab, var(--success) 14%, var(--surface));
+  color: var(--success);
+  font-weight: 600;
+}
+
+.fact-popular-world,
+.fact-youtube-count {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--text-2);
+  font-size: 15px;
+}
+
+.fact-popular-world svg,
+.fact-youtube-count svg {
+  flex: none;
+  color: var(--accent);
+}
+
+.fact-popular-world strong,
+.fact-youtube-count strong {
+  color: var(--text);
+  font-family: var(--display);
+  font-size: 17px;
+  font-weight: 650;
+}
+
+/* One row per country: place, flag, name, a bar (best country = full) and its rank there. */
+.fact-countries {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fact-countries li {
+  display: grid;
+  grid-template-columns: 18px 24px minmax(0, 1fr) minmax(48px, 30%) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+}
+
+.fact-countries li:first-child {
+  background: var(--accent-soft);
+}
+
+.fact-country-pos {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.fact-flag {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.fact-country-name {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fact-country-bar {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.fact-country-bar span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.fact-country-rank {
+  min-width: 52px;
+  color: var(--text-2);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* YouTube: a small picture per video, its title (2 lines at most), channel and views. */
+.fact-videos {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fact-videos a {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 6px;
+  border-radius: var(--radius);
+  color: inherit;
+  text-decoration: none;
+  transition: background-color 0.15s;
+}
+
+.fact-video-thumb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.fact-video-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fact-video-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.fact-video-text strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.fact-video-text span {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fact-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+@media (hover: hover) {
+  .fact-videos a:hover {
+    background: var(--surface-2);
+  }
+}

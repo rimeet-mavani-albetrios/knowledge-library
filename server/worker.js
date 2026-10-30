@@ -11,6 +11,7 @@ import { basicDescription, cleanTitle, normalizeTags } from './robot/describe.js
 import { describeWithAi, aiEnabled, aiState, AiPaused } from './robot/ai.js';
 import { embed, meaningText, toSqlVector } from './robot/embed.js';
 import { hostOf, prettyUrl } from './robot/url.js';
+import { runFacts } from './facts/runner.js';
 
 // Raise this when the robot learns to collect something new: links read by an older robot are then read again.
 export const ROBOT_VERSION = 4; // 4: spaces between the parts of a page, so words don't stick together
@@ -224,6 +225,8 @@ async function chores() {
   await query(`UPDATE links SET status = 'queued' WHERE status = 'failed' AND attempts < $1`, [MAX_ATTEMPTS]);
   kick();
   if (!aiState().paused) upgradeOldLinks().catch(err => console.error('Updating older links failed:', err));
+  // Website facts (facts/runner.js): a few links each round, at most 90 seconds. FACTS_RUNNER=off stops it.
+  if (process.env.FACTS_RUNNER !== 'off') runFacts({ budgetMs: 90_000 }).catch(err => console.error('Website facts failed:', err));
 
   const lastCheck = Number(await getMeta('last_health_check'));
   if (!lastCheck) {
@@ -236,7 +239,7 @@ async function chores() {
 
 // Weekly: marks links whose page is gone, and refreshes GitHub stars.
 export async function checkHealth() {
-  const { rows } = await query(`SELECT id, url, github FROM links WHERE status = 'ready' ORDER BY checked_at NULLS FIRST LIMIT 500`);
+  const { rows } = await query(`SELECT id, url, github, health FROM links WHERE status = 'ready' ORDER BY checked_at NULLS FIRST LIMIT 500`);
   console.log(`Checking ${rows.length} links for broken pages…`);
   let next = 0;
   await Promise.all(
@@ -260,6 +263,12 @@ export async function checkHealth() {
           fields.push(`health = $3`);
         }
         await query(`UPDATE links SET ${fields.join(', ')} WHERE id = $1`, params);
+        // A link that just turned broken goes in its history ("Changes this week", the weekly email).
+        if (dead && row.health !== 'broken') {
+          await query(`INSERT INTO link_history (link_id, kind, data) VALUES ($1, 'dead', '{}')`, [row.id]).catch(err =>
+            console.error('Could not note the broken link:', err.message),
+          );
+        }
       }
     }),
   );

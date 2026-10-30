@@ -3,6 +3,9 @@
 //
 // Groq's free plan gives each model its own daily limit. When one model is used up, the robot
 // moves to the next one in the list. When all are used up, it pauses and tries again later.
+import fs from 'node:fs';
+import path from 'node:path';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { ai as config, CATEGORIES, PRICING } from '../config.js';
 import { normalizeTags } from './describe.js';
 import { hostOf } from './url.js';
@@ -26,9 +29,49 @@ const coolUntil = new Map(); // model → time it can be used again
 let pausedUntil = 0;
 let pauseReason = '';
 
-export const aiEnabled = () => Boolean(config.apiKey && models.length);
+// Filling the whole library at once (server/scripts/fill-facts.js) without the free AI's daily limit:
+// with FACTS_AI=record each question is written to a file for Claude instead of being asked, and with
+// FACTS_AI=replay the answer comes from Claude's answers files. A question is named by the fact, the link and its
+// number within that check ("company:abc123:1"), so a page that changed a little in between still finds its answer.
+export const aiTask = new AsyncLocalStorage();
+const fill = { mode: process.env.FACTS_AI ?? '', dir: process.env.FACTS_AI_DIR || path.join('.data', 'facts-ai') };
+let fillAnswers = null;
+export const fillMode = () => fill.mode;
+
+function loadFillAnswers() {
+  const answers = new Map();
+  for (const file of fs.readdirSync(fill.dir).filter(name => /^answers.*\.jsonl$/.test(name))) {
+    for (const line of fs.readFileSync(path.join(fill.dir, file), 'utf8').split('\n')) {
+      try {
+        const { key, answer } = JSON.parse(line);
+        if (key) answers.set(key, typeof answer === 'string' ? answer : JSON.stringify(answer));
+      } catch {
+        // an empty or broken line
+      }
+    }
+  }
+  return answers;
+}
+
+function fillAnswer(messages, maxTokens) {
+  const task = aiTask.getStore();
+  if (!task) throw new AiPaused(`this question has no name, so it can't be filled (${fill.mode})`, Infinity);
+  const key = `${task.key}:${task.n++}`;
+  if (fill.mode === 'record') {
+    fs.mkdirSync(fill.dir, { recursive: true });
+    fs.appendFileSync(path.join(fill.dir, 'questions.jsonl'), `${JSON.stringify({ key, maxTokens, messages })}\n`);
+    // An empty answer, so the check goes on to its next question (company: the terms page after the privacy page).
+    return { choices: [{ message: { content: '{}' } }] };
+  }
+  fillAnswers ??= loadFillAnswers();
+  if (!fillAnswers.has(key)) throw new AiPaused(`Claude has no answer for ${key}`, Infinity);
+  return { choices: [{ message: { content: fillAnswers.get(key) } }] };
+}
+
+export const aiEnabled = () => Boolean(fill.mode || (config.apiKey && models.length));
 
 export function aiState() {
+  if (fill.mode) return { enabled: true, paused: false };
   if (!aiEnabled()) return { enabled: false, paused: false };
   return { enabled: true, paused: Date.now() < pausedUntil, reason: pauseReason, until: pausedUntil };
 }
@@ -109,7 +152,8 @@ Use only the facts above.`,
 
 // One question to the free AI, moving on to the next model when one is used up (see the top of this file).
 // Gives back the AI service's whole answer.
-async function chat(messages, maxTokens) {
+export async function chat(messages, maxTokens) {
+  if (fill.mode) return fillAnswer(messages, maxTokens);
   if (!aiEnabled()) throw new AiPaused('no AI key is set', Infinity);
   if (Date.now() < pausedUntil) throw new AiPaused(pauseReason, pausedUntil);
 

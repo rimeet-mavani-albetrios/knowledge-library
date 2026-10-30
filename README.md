@@ -57,6 +57,11 @@ It's free to run: Node.js on **Render**, a **Neon** Postgres database, and **Gro
 - Loads 24 links at a time and fetches more as you scroll.
 - A detail panel with what the link does, your note and status, and **alternatives in your library** first;
   everything else the robot found is under "More details". The arrows (or ← →) go to the next or previous result.
+- **Website facts** in the detail window: an "At a glance" row (Trust A · 4.6 on iPhone · Since 2016 · USA) and tabs
+  **Overview / Popularity / Company / Trust / History**. Who runs the website and where (from its own Privacy or
+  Terms page, plus Wikidata), its iPhone app rating, GitHub stars week by week, a trust grade A–F with the reasons,
+  the trackers on its home page, and a **Look back** slider that shows the home page in earlier years (Internet
+  Archive). **Is it right for you?** (owner only): type what you need and the free AI scores the fit out of 10.
 
 **Everything else**
 - Light, dark, or match-my-device theme
@@ -113,6 +118,9 @@ repository. Render reads `render.yaml` and asks for:
 | `GROQ_API_KEY` | Your Groq key |
 | `ADMIN_PASSWORD` | A password you choose, for adding and editing links |
 | `GITHUB_TOKEN` | Optional. A [GitHub token](https://github.com/settings/personal-access-tokens/new) with no permissions, so the robot can read star counts for many repos |
+| `CLOUDFLARE_API_TOKEN` | Optional. A free [Cloudflare token](https://dash.cloudflare.com/profile/api-tokens) (Custom token, Account → Radar → Read) for "Popular in" |
+| `GOOGLE_API_KEY` | Optional. A free [Google Cloud](https://console.cloud.google.com) API key with "YouTube Data API v3" and "Safe Browsing API" turned on |
+| `RESEND_API_KEY`, `WEEKLY_EMAIL_TO` | Optional, for the weekly email. A free [Resend](https://resend.com) key, and the email you signed up to Resend with |
 
 After a few minutes your library is online at `https://<name>.onrender.com`. Click **Log in**, enter your
 password, and add links.
@@ -141,8 +149,16 @@ All settings are environment variables, in `.env` on your computer or in Render'
 | `LIBRARY_TITLE` | The name at the top of the website |
 | `PRIVATE_LIBRARY` | `true` = only you (logged in) can see the library |
 | `GITHUB_TOKEN` | Optional, for GitHub star counts (5,000 lookups/hour instead of 60) |
+| `CLOUDFLARE_API_TOKEN` | Optional, for "Popular in": each website's world rank and top countries (Cloudflare Radar) |
+| `GOOGLE_API_KEY` | Optional, for YouTube tutorials and Google's safety check (YouTube Data API v3 + Safe Browsing API) |
+| `RESEND_API_KEY` | Optional. Turns on the weekly email ("Your library this week") through [Resend](https://resend.com)'s free plan |
+| `WEEKLY_EMAIL_TO` | Where the weekly email goes. Without your own domain in Resend, it must be the email you signed up to Resend with |
+| `WEEKLY_EMAIL_FROM` | Optional: your own sender, like `Library <library@yourdomain.com>`, once you verified that domain in Resend |
+| `PUBLIC_URL` | Optional: the website's address for the email's buttons. On Render it's filled in by itself |
 | `SESSION_SECRET` | Keeps logins safe. Render creates it for you |
 | `AI_BASE_URL`, `AI_API_KEY`, `AI_MODELS` | Optional: use another OpenAI-compatible AI, like Gemini's free plan |
+| `FACTS_RUNNER` | Optional. `off` stops the background website-facts checks (opening a link still collects its facts) |
+| `CRON_SECRET` | Optional: turns on the daily wake-up (price watch, what's new). The same text goes in GitHub's secrets |
 
 ## Free limits (October 2026)
 
@@ -150,7 +166,11 @@ All settings are environment variables, in `.env` on your computer or in Render'
 |---|---|---|
 | Render | 512 MB memory, 750 hours/month | One always-on server. This app uses about 160 MB |
 | Neon | 0.5–1 GB, sleeps when unused | Room for about 10,000–20,000 links (each link keeps the text of its pages, for search) |
+| Resend | 3,000 emails/month, 100/day | The weekly email uses 4–5 a month. Its test sender only sends to your own address |
 | Groq | About 1,000 requests and 200,000 tokens per day, per model | About 70–80 links per day per model. The robot uses 3 models, so about 200–250 per day. Bigger imports finish over the next days automatically |
+| YouTube Data API | 10,000 units per day (a search costs 100) | Up to 80 links per day get their YouTube tutorials; each link is checked again once a month |
+| Cloudflare Radar | Free with a token | About one lookup a second; each website's popularity is checked once a month |
+| Safe Browsing | Free for personal use | Each link is checked once a week, up to 500 addresses in one request |
 
 ## How it works
 
@@ -183,6 +203,35 @@ You paste links ──▶ Server saves them as "waiting" ──▶ Cards appear 
   so it stays fast with thousands of links.
 - **Chores** (retrying AI summaries, the weekly broken-link check) only run while someone uses the library,
   so the database can sleep and stay within the free plan.
+- **Website facts** (`server/facts/`): each kind of fact is one file in `server/facts/kinds/` (company, wikidata,
+  app, age, tls, trackers, archive, stars). The runner checks a few links per round (at most 90 seconds every
+  15 minutes while the library is used), favorites and most-opened first, and checks each fact again after some
+  days or weeks. Opening a link whose facts aren't known yet collects them right away. Only "who runs it" uses the
+  free AI (about 2,500 letters of the legal page). The trust grade is worked out from the other facts
+  (`server/facts/trust.js`). All sources are free and need no key: RDAP, Wikidata, Apple's lookup, the Wayback Machine.
+- **The daily wake-up** (`.github/workflows/daily.yml`): Render's free server sleeps, so once a day (03:30 UTC,
+  9:00 in India) GitHub Actions wakes it and calls `POST /api/cron/daily` with the secret `CRON_SECRET`. The library then
+  checks website facts for a few minutes: **price watch** (each pricing page once a month; a price change is noted
+  in the link's history and a rise shows a small "Price went up" tag for 30 days) and **what's new** (features a
+  website added since last month), then runs the jobs in `server/cron/`. Each check asks the free AI one short
+  question ("what's new" only asks when the page changed), and only a few links are checked at a time. To turn it on: add `CRON_SECRET` in Render's **Environment** tab, then add the same `CRON_SECRET`
+  and `LIBRARY_URL` (your library's address) in GitHub → **Settings → Secrets and variables → Actions**.
+  **GitHub pauses scheduled workflows after 60 days with no activity in the repository.** If the wake-up stops,
+  open **Actions → Daily wake-up → Run workflow** once (or push any change) and it starts again.
+
+## Weekly email
+
+Every Monday morning (the daily wake-up at 9:00 India time) the library can email you **"Your library this week"**:
+price changes, new features, links that stopped working, and websites getting more popular, from the last 7 days.
+Each item has a button that opens it in your library. A week without changes gets a short "quiet week" note.
+
+1. Make a free account at [resend.com](https://resend.com) with the email where you want it.
+2. Create an API key (**API Keys → Create API Key**).
+3. Add `RESEND_API_KEY` and `WEEKLY_EMAIL_TO` (that same email) to `.env` and to Render's **Environment** tab.
+4. In the library, the **⋯** menu has **Weekly email** (on/off) and **Send test email**.
+
+It is on by itself once the key is set, sends at most once a week, and the settings live in the database
+(`meta` table: `weekly_email`, `weekly_email_sent`). Code: `server/email/` and `server/cron/weekly-email.js`.
 
 ## Files
 
@@ -194,6 +243,7 @@ You paste links ──▶ Server saves them as "waiting" ──▶ Cards appear 
 | `server/words.js` | The words that matter in a search, and spelling fixes |
 | `server/worker.js` | The robot that reads websites and asks the AI |
 | `server/robot/` | Page and website reading, GitHub details, AI, tags, duplicates, fingerprints |
+| `server/facts/` | Website facts: the runner, the trust grade, the "Is it right for you?" check, one file per fact |
 | `server/map.js` | Places each link on the knowledge map |
 | `server/schema.sql` | The database table |
 | `web/src/` | The website (React) |
