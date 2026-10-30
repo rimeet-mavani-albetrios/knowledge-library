@@ -660,6 +660,10 @@
   color: var(--danger);
 }
 
+.trust-reasons .is-partial svg {
+  color: var(--muted);
+}
+
 .trackers-count {
   margin: 0;
   color: var(--text-2);

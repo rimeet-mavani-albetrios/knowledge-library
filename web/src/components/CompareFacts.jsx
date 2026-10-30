@@ -11,6 +11,7 @@ import { ShieldCheck, Star, ThumbsUp, TrendingUp } from 'lucide-react';
 import { api } from '../api.js';
 import { compactNumber, timeAgo } from '../format.js';
 import { countryName, countryOf } from './country-names.js';
+import { isPartial } from './facts/cards/Trust.jsx';
 import Flag from './Flag.jsx';
 import './compare-facts.css';
 
@@ -117,7 +118,7 @@ export function factsSection(links, items, winners) {
         render: link => {
           if (!grade(link)) return null;
           const reasons = facts(link).trust?.reasons ?? [];
-          const passed = reasons.filter(reason => reason.ok).length;
+          const passed = reasons.filter(reason => reason.ok && !isPartial(reason)).length; // a partial one isn't a full pass
           return (
             <>
               <span className={`cf-grade is-${grade(link).toLowerCase()}`}>{grade(link)}</span>

@@ -18,7 +18,8 @@ export function gradeTrust(facts = {}, now = Date.now()) {
   const add = (points, max, ok, text) => {
     score += points;
     best += max;
-    reasons.push({ ok, text });
+    // `partial`: not bad, but it didn't earn all its points. It doesn't count as a passed check.
+    reasons.push(ok && points < max ? { ok, text, partial: true } : { ok, text });
   };
 
   const { safety, tls, age, company, wikidata, trackers } = facts;

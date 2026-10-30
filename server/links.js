@@ -171,10 +171,15 @@ export async function listLinks({ filters = {}, sort = 'newest', limit = setting
   } else {
     order = sort === 'oldest' ? 'created_at ASC, id ASC' : 'created_at DESC, id DESC';
     // "Keyset" paging: continue right after the last link of the previous page. Fast even with 100,000 links.
+    // The marker keeps the database's exact time, as text: a JavaScript date would cut its microseconds off.
+    fields = `${FIELDS}, created_at::text AS exact_time`;
     if (after?.t) {
       params.push(after.t, after.id);
       const compare = sort === 'oldest' ? '>' : '<';
-      clauses.push(`(created_at, id) ${compare} ($${params.length - 1}::timestamptz, $${params.length})`);
+      // The link's own time, also for a marker with a cut time from a page opened before this was fixed.
+      // The marker's time is only needed when that link has been deleted in the meantime.
+      const time = `COALESCE((SELECT created_at FROM links WHERE id = $${params.length}), $${params.length - 1}::timestamptz)`;
+      clauses.push(`(created_at, id) ${compare} (${time}, $${params.length})`);
     }
   }
 
@@ -188,7 +193,7 @@ export async function listLinks({ filters = {}, sort = 'newest', limit = setting
   if (rows.length > limit) {
     const last = rows[limit - 1];
     const paged = OFFSET_SORTS[sort] || FACT_SORTS[sort];
-    nextCursor = encodeCursor(paged ? { offset: offset + limit } : { t: new Date(last.created_at).toISOString(), id: last.id });
+    nextCursor = encodeCursor(paged ? { offset: offset + limit } : { t: last.exact_time, id: last.id });
   }
   return { items, nextCursor };
 }
@@ -528,6 +533,8 @@ export async function similarLinks(id, limit = 4) {
 
 // ---------- Tags ----------
 
+const sameList = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
 // The tags the library uses, most used first. The robot gives these to the AI, so tags stay the same everywhere.
 export async function knownTags(limit = 150) {
   const { rows } = await query(
@@ -538,19 +545,27 @@ export async function knownTags(limit = 150) {
 }
 
 // Renames a tag on every link. Renaming it to a tag that already exists merges the two.
+// The same tag spelled differently ("Ai agents" → "AI Agents") takes your new spelling, not the one the library uses now.
+// Answers how many links really changed.
 export async function renameTag(from, to) {
-  const target = normalizeTags([to], await knownTags())[0];
-  if (!target) return 0;
+  const [typed] = normalizeTags([to]);
+  if (!typed) return 0;
   const fromKey = tagKey(from);
+  const target = tagKey(typed) === fromKey ? typed : normalizeTags([to], await knownTags())[0];
   const { rows } = await query(
     `SELECT id, tags, user_tags FROM links WHERE EXISTS (SELECT 1 FROM unnest(tags) AS tag WHERE lower(tag) = lower($1))`,
     [from],
   );
   const swap = tags => normalizeTags(tags.map(tag => (tagKey(tag) === fromKey ? target : tag)));
+  let changed = 0;
   for (const row of rows) {
-    await query('UPDATE links SET tags = $2, user_tags = $3, updated_at = now() WHERE id = $1', [row.id, swap(row.tags), swap(row.user_tags)]);
+    const tags = swap(row.tags);
+    const userTags = swap(row.user_tags);
+    if (sameList(tags, row.tags) && sameList(userTags, row.user_tags)) continue;
+    await query('UPDATE links SET tags = $2, user_tags = $3, updated_at = now() WHERE id = $1', [row.id, tags, userTags]);
+    changed++;
   }
-  return rows.length;
+  return changed;
 }
 
 // Once, for libraries made before tidy tags: "local-ai" becomes "Local AI".
@@ -676,28 +691,46 @@ export async function addLinks(entries, { tags = [], collection = '', note = '' 
 // ---------- Editing ----------
 
 const EDITABLE = { title: 'title', summary: 'summary', useFor: 'use_for', category: 'category', collection: 'collection', note: 'note' };
+const tidyTasks = tasks => tasks.map(task => String(task).replace(/\s+/g, ' ').trim().slice(0, 80)).filter(Boolean).slice(0, 10);
 
 // Returns the saved link, and whether its words changed (then its meaning fingerprint needs an update).
+// The website may send the whole form or only some fields. Only values that really changed are saved and noted in
+// `edited`, so the robot leaves those fields alone from then on (see describedField in worker.js).
 export async function updateLink(id, changes) {
+  const { rows: [current] } = await query('SELECT title, summary, use_for, category, collection, note, tags, tasks FROM links WHERE id = $1', [id]);
+  if (!current) return { link: null, wordsChanged: false };
   const sets = [];
+  const edited = [];
   const params = [id];
   const set = (column, value, cast = '') => {
     params.push(value);
     sets.push(`${column} = $${params.length}${cast}`);
   };
   for (const [key, column] of Object.entries(EDITABLE)) {
-    if (typeof changes[key] === 'string') set(column, changes[key].trim().slice(0, key === 'note' || key === 'summary' ? 1000 : 200));
+    if (typeof changes[key] !== 'string') continue;
+    const fit = text => text.trim().slice(0, key === 'note' || key === 'summary' ? 1000 : 200);
+    if (fit(changes[key]) === fit(current[column])) continue;
+    set(column, fit(changes[key]));
+    edited.push(column);
   }
-  if (Array.isArray(changes.tags)) {
+  if (Array.isArray(changes.tags) && !sameList(changes.tags, current.tags)) {
     // Tags you set by hand are kept even when the AI runs again.
     const tags = normalizeTags(changes.tags, await knownTags());
-    set('tags', tags, '::text[]');
-    set('user_tags', tags, '::text[]');
+    if (!sameList(tags, current.tags)) {
+      set('tags', tags, '::text[]');
+      set('user_tags', tags, '::text[]');
+      edited.push('tags');
+    }
   }
-  if (Array.isArray(changes.tasks)) {
-    set('tasks', changes.tasks.map(task => String(task).replace(/\s+/g, ' ').trim().slice(0, 80)).filter(Boolean).slice(0, 10), '::text[]');
+  if (Array.isArray(changes.tasks) && !sameList(tidyTasks(changes.tasks), tidyTasks(current.tasks))) {
+    set('tasks', tidyTasks(changes.tasks), '::text[]');
+    edited.push('tasks');
   }
   const wordsChanged = sets.length > 0;
+  if (wordsChanged) {
+    params.push(edited);
+    sets.push(`edited = ARRAY(SELECT DISTINCT unnest(edited || $${params.length}::text[]))`);
+  }
   if (typeof changes.favorite === 'boolean') set('favorite', changes.favorite);
   if (changes.myStatus === '' || MY_STATUSES.includes(changes.myStatus)) set('my_status', changes.myStatus);
   if (!sets.length) return { link: await getLink(id), wordsChanged: false };
@@ -734,14 +767,25 @@ export async function bulkChange(ids, action, value = '') {
     const [tag] = normalizeTags([value], await knownTags());
     if (!tag) return { changed: 0, reword: [] };
     const { rows } = await query('SELECT id, tags, user_tags FROM links WHERE id = ANY($1)', [ids]);
+    const hasTag = tags => tags.some(other => tagKey(other) === tagKey(tag));
+    let changed = 0;
+    const reword = [];
     for (const row of rows) {
-      await query('UPDATE links SET tags = $2, user_tags = $3, updated_at = now() WHERE id = $1', [
-        row.id,
-        normalizeTags([...row.tags, tag]),
-        normalizeTags([...row.user_tags, tag]),
-      ]);
+      let tags = normalizeTags([...row.tags, tag]);
+      if (!hasTag(tags)) {
+        // The link's tags are full, so the new tag takes the place of the last one the AI added.
+        const own = row.user_tags.map(tagKey);
+        const last = row.tags.findLastIndex(other => !own.includes(tagKey(other)));
+        if (last < 0) continue; // all of them are your own tags: those are never dropped, so this link stays as it is
+        tags = normalizeTags([...row.tags.toSpliced(last, 1), tag]);
+      }
+      const userTags = normalizeTags([...row.user_tags, tag]);
+      if (sameList(tags, row.tags) && sameList(userTags, row.user_tags)) continue; // it's already your own tag here
+      await query('UPDATE links SET tags = $2, user_tags = $3, updated_at = now() WHERE id = $1', [row.id, tags, userTags]);
+      changed++;
+      if (!sameList(tags, row.tags)) reword.push(row.id);
     }
-    return { changed: rows.length, reword: rows.map(row => row.id) };
+    return { changed, reword };
   }
   return { changed: 0, reword: [] };
 }
