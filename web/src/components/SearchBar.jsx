@@ -7,7 +7,7 @@ import { forwardRef, useEffect, useId, useLayoutEffect, useRef, useState } from 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { ArrowRight, Clock, Hash, LoaderCircle, Search, X } from 'lucide-react';
 import { api, toQuery } from '../api.js';
-import { useDebounced, useRecentSearches, forgetSearch } from '../hooks.js';
+import { PHONE, useDebounced, useMediaQuery, useRecentSearches, forgetSearch } from '../hooks.js';
 import { hostOf } from '../format.js';
 import { SiteIcon } from './LinkCard.jsx';
 
@@ -156,12 +156,14 @@ function Panel({ id, panel, active, onPick, onHover }) {
 // so the page can bring the whole list into view. onOpenLink(id) and onTag(tag) are for the panel.
 // `results` is { page, loading } for the top results (see usePanel).
 // onDown() moves the focus to the results; it returns false when there are none.
-const SearchBar = forwardRef(function SearchBar({ value, results, onSearch, onOpenLink, onTag, onDown, busy = false, compact = false }, ref) {
+// `examples` is off while the library is empty: there is nothing yet for them to find.
+const SearchBar = forwardRef(function SearchBar({ value, results, onSearch, onOpenLink, onTag, onDown, busy = false, compact = false, examples = true }, ref) {
   const [text, setText] = useState(value);
   const debounced = useDebounced(text, PAUSE);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
   const listId = useId();
+  const phone = useMediaQuery(PHONE);
 
   // Follows the back button and example clicks, but keeps the space you just typed at the end.
   useEffect(() => setText(current => (current.trim() === value.trim() ? current : value)), [value]);
@@ -258,7 +260,8 @@ const SearchBar = forwardRef(function SearchBar({ value, results, onSearch, onOp
                 }
               }
             }}
-            placeholder={compact ? 'Search your library…' : 'What do you want to do? Like “convert pdf to excel”…'}
+            // On phones the whole sentence doesn't fit, and half a sentence looks broken.
+            placeholder={compact ? 'Search your library…' : phone ? 'What do you want to do?' : 'What do you want to do? Like “convert pdf to excel”…'}
             aria-label="Search your library"
             autoComplete="off"
             spellCheck="false"
@@ -283,7 +286,7 @@ const SearchBar = forwardRef(function SearchBar({ value, results, onSearch, onOp
         </form>
         {showList && <Panel id={listId} panel={panel} active={active} onPick={pick} onHover={setActive} />}
       </div>
-      {!compact && (
+      {!compact && examples && (
         <p className="examples">
           <span>Try</span>
           {EXAMPLES.map(example => (

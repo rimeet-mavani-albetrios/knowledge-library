@@ -4,17 +4,17 @@
 // show once some links have them.
 // Chosen filters show as chips with an × in a thin row under the toolbar (so they stay in view while you
 // scroll), and the button grows an × of its own that clears them all. The owner can rename a tag there too.
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { X, Star, Pencil, SlidersHorizontal, Unlink, Search, Folder, BadgeDollarSign, ShieldCheck } from 'lucide-react';
 import { api } from '../api.js';
 import { facetsQuery } from '../useLinks.js';
 import { LEVEL_LABELS, MY_STATUS_LABELS } from '../format.js';
-import { PHONE } from '../hooks.js';
 import { GitHubIcon } from './Icons.jsx';
 import { useToast } from './Toasts.jsx';
-import { Popover } from './Popover.jsx';
-import { countryFlag, countryName } from './country-names.js';
+import { Popover, useRoomBelow } from './Popover.jsx';
+import { countryName } from './country-names.js';
+import Flag from './Flag.jsx';
 
 const SOURCES = [
   ['', 'All'],
@@ -63,8 +63,8 @@ function ActiveTag({ tag, owner, setParams }) {
   }
   return (
     <>
-      <button type="button" className="chip chip-active-tag" onClick={() => setParams({ tag: '' })} aria-label={`Remove tag filter ${tag}`}>
-        #{tag} <X size={14} aria-hidden="true" />
+      <button type="button" className="chip chip-active-tag" onClick={() => setParams({ tag: '' })} aria-label={`Remove tag filter ${tag}`} title={tooLong(tag)}>
+        <span className="chip-text">#{tag}</span> <X size={14} aria-hidden="true" />
       </button>
       {owner && (
         <button
@@ -84,11 +84,15 @@ function ActiveTag({ tag, owner, setParams }) {
   );
 }
 
+// A name this long may be cut short with "…" (a very long collection or tag name): the tooltip has all of it.
+const tooLong = text => (text.length > 34 ? text : undefined);
+
 // A filter you chose, shown above the results with an × to take it off.
-function ActiveChip({ label, onRemove }) {
+// `text` is the label in plain words, for screen readers, when `label` is more than words (a country's flag).
+function ActiveChip({ label, text = label, onRemove }) {
   return (
-    <button type="button" className="chip chip-active" onClick={onRemove} aria-label={`Remove filter: ${label}`}>
-      {label} <X size={14} aria-hidden="true" />
+    <button type="button" className="chip chip-active" onClick={onRemove} aria-label={`Remove filter: ${text}`} title={tooLong(text)}>
+      <span className="chip-text">{label}</span> <X size={14} aria-hidden="true" />
     </button>
   );
 }
@@ -102,7 +106,15 @@ const EMPTY = {
 };
 const CLEAR_ALL = { source: '', free: false, favorite: false, level: '', status: '', collection: '', tag: '', broken: false, country: '', trust: false };
 
-const countryLabel = code => (code === UNKNOWN_COUNTRY ? 'Country not known yet' : `${countryFlag(code)} ${countryName(code)}`.trim());
+const countryText = code => (code === UNKNOWN_COUNTRY ? 'Country not known yet' : countryName(code));
+const countryLabel = code =>
+  code === UNKNOWN_COUNTRY ? (
+    countryText(code)
+  ) : (
+    <>
+      <Flag code={code} /> {countryName(code)}
+    </>
+  );
 
 // How many links each filter option has, for the current search and filters. Shared by the toolbar and the panel.
 export function useFacets(params) {
@@ -110,7 +122,7 @@ export function useFacets(params) {
   return facets.data ?? EMPTY;
 }
 
-// The filters that are on, except the category (the toolbar shows that one): [{ key, label, clear }].
+// The filters that are on, except the category (the toolbar shows that one): [{ key, label, text?, clear }].
 function activeFilters(params) {
   const { source, collection, level, status, favorite, free, broken, country, trust } = params;
   return [
@@ -119,7 +131,7 @@ function activeFilters(params) {
     favorite && { key: 'favorite', label: 'Favorites', clear: { favorite: false } },
     broken && { key: 'broken', label: 'Broken links', clear: { broken: false } },
     trust && { key: 'trust', label: 'Trust A–B', clear: { trust: false } },
-    country && { key: 'country', label: countryLabel(country), clear: { country: '' } },
+    country && { key: 'country', label: countryLabel(country), text: countryText(country), clear: { country: '' } },
     status && { key: 'status', label: MY_STATUS_LABELS[status] ?? status, clear: { status: '' } },
     level && { key: 'level', label: LEVEL_LABELS[level] ?? level, clear: { level: '' } },
     collection && { key: 'collection', label: collection, clear: { collection: '' } },
@@ -135,8 +147,8 @@ export function ActiveFilters({ params, setParams, owner }) {
   return (
     <div className="active-filters" aria-label="Filters that are on">
       <span className="active-filters-label">Showing</span>
-      {active.map(({ key, label, clear }) => (
-        <ActiveChip key={key} label={label} onRemove={() => setParams(clear)} />
+      {active.map(({ key, label, text, clear }) => (
+        <ActiveChip key={key} label={label} text={text} onRemove={() => setParams(clear)} />
       ))}
       {params.tag && <ActiveTag key={params.tag} tag={params.tag} owner={owner} setParams={setParams} />}
       {activeCount(params) > 1 && (
@@ -179,7 +191,10 @@ function FiltersPanel({ params, setParams, data, onDone }) {
   const countries = allCountries ? data.countries : data.countries.filter((item, i) => i < COUNTRIES_SHOWN || item.value === country);
   const sources = SOURCES.filter(([value]) => !value || count(data.sources, value) || source === value);
   const needle = find.trim().toLowerCase();
-  const tags = data.tags.filter(item => !needle || item.value.toLowerCase().includes(needle)).slice(0, needle ? 40 : 18);
+  // The most used tags, plus the chosen one, so it can be turned off here too.
+  const tags = data.tags
+    .filter(item => !needle || item.value.toLowerCase().includes(needle))
+    .filter((item, i) => i < (needle ? 40 : 18) || item.value === tag);
   const showOnly = [
     (data.free > 0 || free) && { key: 'free', on: free, label: 'Free', Icon: BadgeDollarSign, n: data.free },
     (data.favorites > 0 || favorite) && { key: 'favorite', on: favorite, label: 'Favorites', Icon: Star, n: data.favorites },
@@ -237,12 +252,12 @@ function FiltersPanel({ params, setParams, data, onDone }) {
           <Section title="Collection">
             {collections.map(({ value, count: n }) => (
               <Choice key={value} on={collection === value} onClick={() => setParams({ collection: collection === value ? '' : value })}>
-                <Folder size={15} aria-hidden="true" /> {value} <span className="chip-count">{n}</span>
+                <Folder size={15} aria-hidden="true" /> <span className="chip-text" title={tooLong(value)}>{value}</span> <span className="chip-count">{n}</span>
               </Choice>
             ))}
             {collection && !count(data.collections, collection) && (
               <Choice on onClick={() => setParams({ collection: '' })}>
-                <Folder size={15} aria-hidden="true" /> {collection}
+                <Folder size={15} aria-hidden="true" /> <span className="chip-text" title={tooLong(collection)}>{collection}</span>
               </Choice>
             )}
             {data.collections.length > COLLECTIONS_SHOWN ? (
@@ -257,9 +272,7 @@ function FiltersPanel({ params, setParams, data, onDone }) {
           <Section title="Company country">
             {countries.map(({ value, count: n }) => (
               <Choice key={value} on={country === value} onClick={() => setParams({ country: country === value ? '' : value })}>
-                <span className="fp-flag" aria-hidden="true">
-                  {countryFlag(value)}
-                </span>
+                <Flag code={value} className="fp-flag" />
                 {countryName(value)} <span className="chip-count">{n}</span>
               </Choice>
             ))}
@@ -316,34 +329,6 @@ function FiltersPanel({ params, setParams, data, onDone }) {
       </footer>
     </div>
   );
-}
-
-const ROOM = 420; // the panel wants at least this much room under its button
-const MIN_ROOM = 240;
-
-// Keeps the open panel inside the window: it's only as tall as the room under the button (its sections scroll,
-// its footer with "Show … links" stays in view). Opened low on the screen, the page first moves up a little to
-// make room; the toolbar sticks under the top bar, so that always works on a long page. Phones show a sheet instead.
-function useRoomBelow(open, button, wrap) {
-  useLayoutEffect(() => {
-    if (!open || window.matchMedia(PHONE).matches) return undefined;
-    const measure = () => {
-      const room = window.innerHeight - button.current.getBoundingClientRect().bottom - 24;
-      wrap.current.style.setProperty('--fp-room', `${Math.max(MIN_ROOM, Math.round(room))}px`);
-      return room;
-    };
-    const room = measure();
-    if (room < ROOM) {
-      window.scrollBy({ top: ROOM - room, behavior: 'instant' });
-      measure();
-    }
-    window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, { passive: true });
-    return () => {
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure);
-    };
-  }, [open, button, wrap]);
 }
 
 // The "Filters" button in the toolbar, with a badge that says how many filters are on.

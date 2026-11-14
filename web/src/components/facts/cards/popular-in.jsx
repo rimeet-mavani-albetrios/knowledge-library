@@ -3,13 +3,14 @@
 // Cloudflare only names the countries where a website is in that country's top 100 (at most 5), so big countries
 // like India show up only for very big websites. The list says so, and India comes first when it's there.
 import { Earth, TrendingUp } from 'lucide-react';
+import Flag from '../../Flag.jsx';
 import './popularity.css';
 
 export const tab = 'popularity';
 export const order = 10;
 
 const SHOWN = 8;
-const HOME = 'IN'; // your own country comes first in the list, and is the only one named on the chip
+const HOME = 'IN'; // your own country comes first in the list, and is the only one named on the tile
 const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
 const SHORT_NAMES = { US: 'USA', GB: 'UK', AE: 'UAE', HK: 'Hong Kong', MO: 'Macao', KR: 'South Korea', CZ: 'Czechia' };
 const LONG_NAMES = { HK: 'Hong Kong', MO: 'Macao', PS: 'Palestine' };
@@ -24,9 +25,6 @@ const countryName = (code, short = false) => {
     return code;
   }
 };
-
-// "IN" → 🇮🇳 (two "regional indicator" letters make a flag).
-const flagOf = code => String.fromCodePoint(...[...code.toUpperCase()].map(letter => 0x1f1a5 + letter.charCodeAt(0)));
 
 // "Top 10K" for a bucket, "#3" for the top 100.
 export function rankText(popularity) {
@@ -45,13 +43,16 @@ const homeFirst = (top = []) => [...top].sort((a, b) => (b.country === HOME) - (
 
 export function glance(facts) {
   const popularity = facts?.popularity;
-  const rank = rankText(popularity);
-  if (!rank) return null;
-  // "Tunisia, Lebanon" on the chip reads like "most visitors come from there", so only India is named.
+  const rankLabel = rankText(popularity);
+  if (!rankLabel) return null;
+  // "Tunisia, Lebanon" on the tile reads like "most visitors come from there", so only India is named.
   const home = (popularity.top ?? []).find(place => place.country === HOME);
   return {
     icon: popularity.rising ? TrendingUp : Earth,
-    text: [`${rank} site`, home && `${countryName(HOME, true)} #${whole.format(home.rank)}`].filter(Boolean).join(' · '),
+    label: 'Popularity',
+    value: rankLabel,
+    note: home ? `${countryName(HOME, true)} #${whole.format(home.rank)}` : popularity.rising ? 'Rising' : undefined,
+    rank: 10,
     tab,
     tone: popularity.rising ? 'good' : undefined,
   };
@@ -67,7 +68,9 @@ export default function PopularIn({ facts }) {
   return (
     <section className="fact-card fact-popular">
       <div className="fact-popular-head">
-        <h3 className="fact-card-title">Popular in</h3>
+        <h3 className="fact-card-title">
+          <Earth size={14} aria-hidden="true" /> Popularity worldwide
+        </h3>
         {popularity.rising && (
           <span className="pill fact-rising" title="Cloudflare sees this website climbing fast right now">
             <TrendingUp size={13} aria-hidden="true" /> Rising
@@ -77,10 +80,7 @@ export default function PopularIn({ facts }) {
 
       {rank ? (
         <p className="fact-popular-world">
-          <Earth size={18} aria-hidden="true" />
-          <span>
-            <strong>{rank} website</strong> in the world
-          </span>
+          <strong>{rank} website</strong> in the world
         </p>
       ) : (
         <p className="fact-empty">
@@ -99,8 +99,8 @@ export default function PopularIn({ facts }) {
           {top.map((place, index) => (
             <li key={place.country}>
               <span className="fact-country-pos">{index + 1}</span>
-              <span className="fact-flag" aria-hidden="true">
-                {flagOf(place.country)}
+              <span className="fact-flag">
+                <Flag code={place.country.toUpperCase()} />
               </span>
               <span className="fact-country-name">{countryName(place.country)}</span>
               <span className="fact-country-bar" aria-hidden="true">

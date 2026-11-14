@@ -30,6 +30,14 @@
   transition: opacity 0.14s ease-out, transform 0.14s ease-out;
 }
 
+/* Dark: an off-white label would glare on a dark page, so it is a lighter grey box with a faint edge instead.
+   (The arrow takes the same background.) */
+:root[data-theme='dark'] .tip {
+  background: #35383e;
+  color: var(--text);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / 0.06), 0 4px 14px rgb(0 0 0 / 0.5);
+}
+
 .tip[hidden] {
   display: none;
 }

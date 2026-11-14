@@ -11,6 +11,7 @@ const STRONG_MEANING = 0.45; // from here on, the meaning alone makes a link a "
 const WORDS_NEED_MEANING = 0.2; // your words alone aren't enough when the link is about something else
 const BEST_WORDS = 0.6; // a best match has at least this share of the search's weight in its important places…
 const RELATED_WORDS = 0.5; // …and a related link at least this much
+const WORDS_IN_NAME = 0.9; // the name only lifts a link when it has your words: one word of a longer search says little
 const BEST_MAX = 12; // the strongest 12 are best matches; more would just be a long list again
 const COMMON_SHARE = 0.35; // a word in more than 35% of the links ("ai", "free") can't make a best match alone
 export const LEVELS = ['beginner', 'intermediate', 'advanced'];
@@ -76,7 +77,9 @@ export function toLink(row) {
   }
   if (row.price_up_at) link.priceUpAt = row.price_up_at;
   if ('best' in row) link.match = row.best ? 'best' : 'related';
-  if (row.snippet) link.snippet = row.snippet;
+  // A line without your words in it says nothing about why it matched: the card shows the summary instead.
+  const why = whyItMatched(row.why_written) ?? whyItMatched(row.why_page, readsLikeSentence);
+  if (why) link.snippet = why;
   return link;
 }
 
@@ -110,9 +113,14 @@ function filterSql(filters, params, skip = '') {
   return clauses;
 }
 
-// The country of the company behind a website: from its Terms page, else from Wikidata. Two-letter codes ("US").
+// The country of a link, as a two-letter code ("US"), one answer for the filter, its counts and the Stats page:
+// the `place` fact (server/facts/kinds/place.js) once it's worked out, before that the company's Terms page or
+// Wikidata. Anything that isn't two capital letters counts as not known. (No "?" in here: filterSql's add() would
+// take it for the value's place.)
 export const COUNTRY_OF = table =>
-  `upper(coalesce(nullif(${table}.facts #>> '{company,country}', ''), nullif(${table}.facts #>> '{wikidata,country}', '')))`;
+  `substring(upper(CASE WHEN ${table}.facts -> 'place' IS NOT NULL THEN ${table}.facts #>> '{place,country}'
+    ELSE coalesce(nullif(${table}.facts #>> '{company,country}', ''), nullif(${table}.facts #>> '{wikidata,country}', '')) END)
+    from '^[A-Z]{2}$')`;
 export const UNKNOWN_COUNTRY = 'unknown'; // the country filter's value for links whose country isn't known (yet)
 
 const whereOf = clauses => (clauses.length ? `WHERE ${clauses.join(' AND ')}` : '');
@@ -166,10 +174,15 @@ export async function listLinks({ filters = {}, sort = 'newest', limit = setting
   } else {
     order = sort === 'oldest' ? 'created_at ASC, id ASC' : 'created_at DESC, id DESC';
     // "Keyset" paging: continue right after the last link of the previous page. Fast even with 100,000 links.
+    // The marker keeps the database's exact time, as text: a JavaScript date would cut its microseconds off.
+    fields = `${FIELDS}, created_at::text AS exact_time`;
     if (after?.t) {
       params.push(after.t, after.id);
       const compare = sort === 'oldest' ? '>' : '<';
-      clauses.push(`(created_at, id) ${compare} ($${params.length - 1}::timestamptz, $${params.length})`);
+      // The link's own time, also for a marker with a cut time from a page opened before this was fixed.
+      // The marker's time is only needed when that link has been deleted in the meantime.
+      const time = `COALESCE((SELECT created_at FROM links WHERE id = $${params.length}), $${params.length - 1}::timestamptz)`;
+      clauses.push(`(created_at, id) ${compare} (${time}, $${params.length})`);
     }
   }
 
@@ -183,7 +196,7 @@ export async function listLinks({ filters = {}, sort = 'newest', limit = setting
   if (rows.length > limit) {
     const last = rows[limit - 1];
     const paged = OFFSET_SORTS[sort] || FACT_SORTS[sort];
-    nextCursor = encodeCursor(paged ? { offset: offset + limit } : { t: new Date(last.created_at).toISOString(), id: last.id });
+    nextCursor = encodeCursor(paged ? { offset: offset + limit } : { t: last.exact_time, id: last.id });
   }
   return { items, nextCursor };
 }
@@ -194,17 +207,102 @@ export async function countLinks(filters = {}) {
   return rows[0].n;
 }
 
+// ---------- Every link in a view, for Select mode's "Select all" ----------
+
+// The most links one "Select all" (and one change to many links) takes at once. A bigger view gets its first
+// MAX_BULK links, in the list's order, and is told so: one click never changes the whole library by surprise.
+export const MAX_BULK = 2000;
+
+// The ids of every link the list shows for these filters, in the same order, not only the 24 loaded so far.
+// `capped` says the view has more than MAX_BULK links.
+export async function listIds({ filters = {}, sort = 'newest' } = {}) {
+  const params = [];
+  const clauses = filterSql(filters, params);
+  let order = OFFSET_SORTS[sort] ?? (sort === 'oldest' ? 'created_at ASC, id ASC' : 'created_at DESC, id DESC');
+  let from = 'links';
+  if (FACT_SORTS[sort]) {
+    order = FACT_SORTS[sort];
+    from = 'links LEFT JOIN link_facts AS lf ON lf.link_id = links.id';
+  }
+  params.push(MAX_BULK + 1); // one more than the most, to know whether there are more
+  const { rows } = await query(`SELECT links.id FROM ${from} ${whereOf(clauses)} ORDER BY ${order} LIMIT $${params.length}`, params);
+  return { ids: rows.slice(0, MAX_BULK).map(row => row.id), capped: rows.length > MAX_BULK, max: MAX_BULK };
+}
+
+// The same for a search: every result, best matches first, as the list shows them.
+export async function searchIds({ q, vector, filters = {} }) {
+  const params = [];
+  const cte = await searchCte(q, vector, filters, params);
+  if (!cte) return { ids: [], capped: false, max: MAX_BULK };
+  params.push(MAX_BULK + 1);
+  const { rows } = await query(
+    `${cte.with}
+     SELECT links.id FROM found JOIN links ON links.id = found.id
+     ORDER BY found.best DESC, found.score DESC, links.created_at DESC LIMIT $${params.length}`,
+    params,
+  );
+  return { ids: rows.slice(0, MAX_BULK).map(row => row.id), capped: rows.length > MAX_BULK, max: MAX_BULK };
+}
+
 // ---------- Smart search: words + meaning, best matches first, then the related ones ----------
 
+// A few words that mean the same ("local|offline|self hosted", see SAME_MEANING in words.js): any of them will do.
+const isSameMeaning = word => word.includes('|');
+const sameMeaningTerm = (word, places) =>
+  `(${word.split('|').map(one => one.split(' ').map(part => part + places).join(' <-> ')).join(' | ')})`;
 // Words of 4 letters or more also find longer words while you type ("ollam" finds "ollama", "edit" finds "editor").
 // Short words must match exactly, so "ai" doesn't find "air".
-const term = word => (word.length >= 4 ? `${word}:*` : word);
+const term = word => (isSameMeaning(word) ? sameMeaningTerm(word, '') : word.length >= 4 ? `${word}:*` : word);
 // The same, but only in the important places: name and tasks (A), tags, search words and headings (B), summaries (C).
 // Not the page text (D), where almost every word shows up somewhere.
-const strongTerm = word => (word.length >= 4 ? `${word}:*ABC` : `${word}:ABC`);
+const strongTerm = word => (isSameMeaning(word) ? sameMeaningTerm(word, ':ABC') : word.length >= 4 ? `${word}:*ABC` : `${word}:ABC`);
 
-// Marks around your words in the "why it matched" line. The website turns them into bold text.
-const HEADLINE = 'MaxWords=26, MinWords=12, ShortWord=2, MaxFragments=1, StartSel="", StopSel=""';
+// Marks around your words in the "why it matched" line. The website turns them into bold text. The whole text comes back
+// with the marks in it (HighlightAll), and whyItMatched below picks whole sentences from it.
+const MARK = '\uE000';
+const HEADLINE = `HighlightAll=true, StartSel="${MARK}", StopSel="\uE001"`;
+const WHY_WORDS = 26; // the longest "why it matched" line, in words: about one row on a computer
+// Where the line comes from first: what the robot wrote for people, one place per line of text. Only when your words
+// aren't there, the saved page text, where whole sentences are rarer.
+const WRITTEN = table => `array_to_string(${table}.tasks, E'\\n') || E'\\n' || ${table}.summary || E'\\n' || ${table}.use_for || E'\\n' || ${table}.overview`;
+const whyTexts = (table, words) => `ts_headline('english', ${WRITTEN(table)}, ${words}, '${HEADLINE}') AS why_written,
+  CASE WHEN to_tsvector('english', ${WRITTEN(table)}) @@ ${words} THEN NULL ELSE ts_headline('english', left(${table}.content, 10000), ${words}, '${HEADLINE}') END AS why_page`;
+// The end of a sentence: . ! ? and then a new start. "e.g." and the like don't end one.
+const SENTENCE_END = /(?<!\b(?:[Ee]\.g|[Ii]\.e|[Vv]s|[Ee]tc|[Ii]nc|[Ll]td|[Dd]r|[Mm]rs?|[Mm]s|[Ss]t|[Nn]o)\.)(?<=[.!?…]["'”’)\]]*)\s+(?=["'“‘(\[\uE000]?[\p{Lu}\p{N}])/u;
+
+// Your words in a sentence. Only their first letters count, so "run" and "running" are one word.
+const wordsIn = sentence => new Set([...sentence.matchAll(/\uE000([^\uE001]*)\uE001/g)].map(found => found[1].slice(0, 3).toLowerCase()));
+const unmarked = text => text.replace(/[\uE000\uE001]/g, '');
+// The page text also holds menus and buttons ("Pricing Docs Blog Log in"): it only counts when it reads like a sentence.
+function readsLikeSentence(sentence) {
+  const plain = unmarked(sentence);
+  const words = plain.split(/\s+/);
+  return words.length >= 5 && words.length <= WHY_WORDS && /^["'“‘(\[]?[\p{Lu}\p{N}]/u.test(plain) && /[.!?]["'”’)\]]*$/.test(plain)
+    && words.filter(word => /^\p{Lu}/u.test(word)).length <= words.length * 0.4;
+}
+// A long sentence is cut at a word, around the first of your words, and the "…" says so.
+function shortened(sentence) {
+  const words = sentence.split(/\s+/);
+  if (words.length <= WHY_WORDS) return sentence;
+  const first = words.findIndex(word => word.includes(MARK));
+  const from = first < WHY_WORDS - 8 ? 0 : first - 8;
+  return `${from ? '… ' : ''}${words.slice(from, from + WHY_WORDS).join(' ')}${from + WHY_WORDS < words.length ? ' …' : ''}`;
+}
+// Notes from the robot ("The page text could not be read.") say nothing about why a link matched.
+const ROBOT_NOTE = /\bpage text\b|\bcould not be read\b/i;
+// The sentence with the most of your words (the first one when it's a tie: tasks come first), plus a second one
+// when it adds other words of yours and the line stays short. Nothing when no good sentence has your words.
+function whyItMatched(text, isGood = () => true) {
+  if (!text?.includes(MARK)) return undefined;
+  const sentences = text.split('\n').flatMap(line => line.trim().split(SENTENCE_END))
+    .filter(sentence => sentence.includes(MARK) && !ROBOT_NOTE.test(unmarked(sentence)) && isGood(sentence));
+  if (!sentences.length) return undefined;
+  const best = sentences.reduce((top, sentence) => (wordsIn(sentence).size > wordsIn(top).size ? sentence : top));
+  const known = wordsIn(best);
+  const second = sentences.find(sentence => [...wordsIn(sentence)].some(word => !known.has(word)) && `${best} ${sentence}`.split(/\s+/).length <= WHY_WORDS);
+  const startBig = sentence => sentence.replace(/^(\uE000?)(\p{Ll})/u, (start, mark, letter) => mark + letter.toUpperCase()); // tasks can start small
+  return second ? `${startBig(best).replace(/[.!?…]?$/, end => end || '.')} ${startBig(second)}` : startBig(shortened(best));
+}
 
 // How much each word of a search counts. A word that's in most of your links ("ai" is in 9 of 10) says little about
 // what you want, so it counts little; a rare one ("logo", "pdf") counts a lot. Filler words ("website") count half.
@@ -246,9 +344,14 @@ async function searchCte(q, vector, filters, params) {
   let similarity = '0';
   if (vector) {
     const v = `${add(vector)}::vector`;
-    const clauses = ['embedding IS NOT NULL', ...filterSql(filters, params)];
+    // The 300 closest in the whole library, and then the filters: a filter only ever narrows the results. So the list
+    // says the same number as the filters' counts (facets(), which asks without the filters and counts them after).
+    const chosen = filterSql(filters, params);
     parts.push(`meaning AS (
-      SELECT id, 1 - (embedding <=> ${v}) AS similarity FROM links ${whereOf(clauses)} ORDER BY embedding <=> ${v} LIMIT 300
+      SELECT id, similarity FROM (
+        SELECT id, 1 - (embedding <=> ${v}) AS similarity FROM links WHERE embedding IS NOT NULL ORDER BY embedding <=> ${v} LIMIT 300
+      ) AS nearest
+      ${chosen.length ? `WHERE id IN (SELECT id FROM links ${whereOf(chosen)})` : ''}
     )`);
     sources.push('SELECT id FROM meaning');
     similarity = 'COALESCE(meaning.similarity, 0)';
@@ -277,8 +380,13 @@ async function searchCte(q, vector, filters, params) {
   const meaningToo = vector ? ` AND similarity >= ${WORDS_NEED_MEANING}` : '';
 
   const exact = add(q.trim().toLowerCase());
+  // The name without its spaces and dots: "post hog" finds PostHog, "shadcn blocks" finds Shadcnblocks, "flyio" finds Fly.io.
+  const squeezed = q.toLowerCase().replace(/[^a-z0-9]+/g, '');
+  const sameName = squeezed ? `regexp_replace(lower(title), '[^a-z0-9]+', '', 'g') = ${add(squeezed)}` : 'false';
+  parts.push(`names AS (SELECT id FROM links ${whereOf([sameName, ...filterSql(filters, params)])})`);
+  sources.push('SELECT id FROM names');
   parts.push(`candidates AS (
-    SELECT links.id, ${similarity} AS similarity, ${wordColumns}, lower(links.title) = ${exact} AS exact_title, links.favorite, links.opens
+    SELECT links.id, ${similarity} AS similarity, ${wordColumns}, lower(links.title) = ${exact} OR links.id IN (SELECT id FROM names) AS exact_title, links.favorite, links.opens
     FROM (${sources.join(' UNION ')}) AS ids
     JOIN links ON links.id = ids.id
     ${vector ? 'LEFT JOIN meaning ON meaning.id = links.id' : ''}
@@ -286,7 +394,7 @@ async function searchCte(q, vector, filters, params) {
   parts.push(`matches AS (
     SELECT id,
       (${byWords} AND matched >= ${BEST_WORDS}${meaningToo}) OR similarity >= ${STRONG_MEANING} OR exact_title AS qualifies,
-      similarity + 0.6 * word_rank + 0.35 * matched + 0.3 * in_title + CASE WHEN exact_title THEN 0.5 ELSE 0 END
+      similarity + 0.6 * word_rank + 0.35 * matched + CASE WHEN in_title >= ${WORDS_IN_NAME} THEN 0.2 ELSE 0 END + CASE WHEN exact_title THEN 0.5 ELSE 0 END
         -- a small push for your favorites and the links you open most
         + CASE WHEN favorite THEN 0.03 ELSE 0 END + 0.03 * least(opens, 20) / 20.0 AS score
     FROM candidates
@@ -310,7 +418,7 @@ export async function searchLinks({ q, vector, filters = {}, limit = settings.pa
     params.push(limit + 1, offset);
     ({ rows } = await query(
       `${cte.with}
-       SELECT page.*${any ? `, ts_headline('english', array_to_string(page.tasks, '. ') || '. ' || page.summary || ' ' || left(more.content, 10000), ${any}, '${HEADLINE}') AS snippet` : ''}
+       SELECT page.*${any ? `, ${whyTexts('more', any)}` : ''}
        FROM (
          SELECT ${prefixed(FIELDS, 'links')}, ${PRICE_UP}, found.best, found.score, count(*) OVER () AS total, count(*) FILTER (WHERE found.best) OVER () AS best_total
          FROM found JOIN links ON links.id = found.id
@@ -333,12 +441,7 @@ export async function searchLinks({ q, vector, filters = {}, limit = settings.pa
     return { items: closest.map(toLink), nextCursor: null, total: 0, bestTotal: 0, closestOnly: true };
   }
   return {
-    items: rows.slice(0, limit).map(row => {
-      const link = toLink(row);
-      // A line without your words in it says nothing about why it matched: the card shows the summary instead.
-      if (link.snippet && !link.snippet.includes('')) delete link.snippet;
-      return link;
-    }),
+    items: rows.slice(0, limit).map(toLink),
     nextCursor: rows.length > limit ? encodeCursor({ offset: offset + limit }) : null,
     total: Number(rows[0]?.total ?? 0),
     bestTotal: Number(rows[0]?.best_total ?? 0),
@@ -446,20 +549,19 @@ export async function shortcuts(limit = 12) {
 
 // ---------- One link ----------
 
-// With a search, `snippet` shows where its words appear in the website's text.
+// With a search, `snippet` is the same "why it matched" line as in the list, so the line holds still when the window opens.
 export async function getLink(id, q = '') {
   const words = q ? searchWords(q) : [];
+  const key = words.length ? (await wordWeights(words)).filter(weight => !weight.common).map(weight => weight.word) : [];
+  const shown = key.length ? key : words;
   const params = [id];
-  let snippet = '';
-  if (words.length) {
-    params.push(words.map(term).join(' | '));
-    snippet = `, ts_headline('english', left(content, 20000), to_tsquery('english', $2), '${HEADLINE}') AS snippet`;
+  let why = '';
+  if (shown.length) {
+    params.push(shown.map(term).join(' | '));
+    why = `, ${whyTexts('links', `to_tsquery('english', $2)`)}`;
   }
-  const { rows } = await query(`SELECT ${DETAIL_FIELDS}${snippet} FROM links WHERE id = $1`, params);
-  if (!rows[0]) return null;
-  const link = toLink(rows[0]);
-  if (link.snippet && !link.snippet.includes('')) delete link.snippet;
-  return link;
+  const { rows } = await query(`SELECT ${DETAIL_FIELDS}${why} FROM links WHERE id = $1`, params);
+  return rows[0] ? toLink(rows[0]) : null;
 }
 
 export async function getLinks(ids) {
@@ -481,6 +583,8 @@ export async function similarLinks(id, limit = 4) {
 
 // ---------- Tags ----------
 
+const sameList = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
 // The tags the library uses, most used first. The robot gives these to the AI, so tags stay the same everywhere.
 export async function knownTags(limit = 150) {
   const { rows } = await query(
@@ -491,19 +595,27 @@ export async function knownTags(limit = 150) {
 }
 
 // Renames a tag on every link. Renaming it to a tag that already exists merges the two.
+// The same tag spelled differently ("Ai agents" → "AI Agents") takes your new spelling, not the one the library uses now.
+// Answers how many links really changed.
 export async function renameTag(from, to) {
-  const target = normalizeTags([to], await knownTags())[0];
-  if (!target) return 0;
+  const [typed] = normalizeTags([to]);
+  if (!typed) return 0;
   const fromKey = tagKey(from);
+  const target = tagKey(typed) === fromKey ? typed : normalizeTags([to], await knownTags())[0];
   const { rows } = await query(
     `SELECT id, tags, user_tags FROM links WHERE EXISTS (SELECT 1 FROM unnest(tags) AS tag WHERE lower(tag) = lower($1))`,
     [from],
   );
   const swap = tags => normalizeTags(tags.map(tag => (tagKey(tag) === fromKey ? target : tag)));
+  let changed = 0;
   for (const row of rows) {
-    await query('UPDATE links SET tags = $2, user_tags = $3, updated_at = now() WHERE id = $1', [row.id, swap(row.tags), swap(row.user_tags)]);
+    const tags = swap(row.tags);
+    const userTags = swap(row.user_tags);
+    if (sameList(tags, row.tags) && sameList(userTags, row.user_tags)) continue;
+    await query('UPDATE links SET tags = $2, user_tags = $3, updated_at = now() WHERE id = $1', [row.id, tags, userTags]);
+    changed++;
   }
-  return rows.length;
+  return changed;
 }
 
 // Once, for libraries made before tidy tags: "local-ai" becomes "Local AI".
@@ -623,39 +735,52 @@ export async function addLinks(entries, { tags = [], collection = '', note = '' 
   return result;
 }
 
-// Which of these addresses are already in the library, in any spelling (www, http/https, tracking codes…).
-export async function savedUrls(urls) {
-  const keys = new Map(urls.map(url => [url, urlKey(url)]));
-  const { rows } = await query('SELECT url_key FROM links WHERE url_key = ANY($1)', [[...new Set(keys.values())].filter(Boolean)]);
-  const taken = new Set(rows.map(row => row.url_key));
-  return urls.filter(url => taken.has(keys.get(url)));
-}
+// Which addresses are already in the library (and which are the same page or website as a saved link) is
+// checkUrls in duplicates.js, for the "Add links" window.
 
 // ---------- Editing ----------
 
 const EDITABLE = { title: 'title', summary: 'summary', useFor: 'use_for', category: 'category', collection: 'collection', note: 'note' };
+const tidyTasks = tasks => tasks.map(task => String(task).replace(/\s+/g, ' ').trim().slice(0, 80)).filter(Boolean).slice(0, 10);
 
 // Returns the saved link, and whether its words changed (then its meaning fingerprint needs an update).
+// The website may send the whole form or only some fields. Only values that really changed are saved and noted in
+// `edited`, so the robot leaves those fields alone from then on (see describedField in worker.js).
 export async function updateLink(id, changes) {
+  const { rows: [current] } = await query('SELECT title, summary, use_for, category, collection, note, tags, tasks FROM links WHERE id = $1', [id]);
+  if (!current) return { link: null, wordsChanged: false };
   const sets = [];
+  const edited = [];
   const params = [id];
   const set = (column, value, cast = '') => {
     params.push(value);
     sets.push(`${column} = $${params.length}${cast}`);
   };
   for (const [key, column] of Object.entries(EDITABLE)) {
-    if (typeof changes[key] === 'string') set(column, changes[key].trim().slice(0, key === 'note' || key === 'summary' ? 1000 : 200));
+    if (typeof changes[key] !== 'string') continue;
+    const fit = text => text.trim().slice(0, key === 'note' || key === 'summary' ? 1000 : 200);
+    if (fit(changes[key]) === fit(current[column])) continue;
+    set(column, fit(changes[key]));
+    edited.push(column);
   }
-  if (Array.isArray(changes.tags)) {
+  if (Array.isArray(changes.tags) && !sameList(changes.tags, current.tags)) {
     // Tags you set by hand are kept even when the AI runs again.
     const tags = normalizeTags(changes.tags, await knownTags());
-    set('tags', tags, '::text[]');
-    set('user_tags', tags, '::text[]');
+    if (!sameList(tags, current.tags)) {
+      set('tags', tags, '::text[]');
+      set('user_tags', tags, '::text[]');
+      edited.push('tags');
+    }
   }
-  if (Array.isArray(changes.tasks)) {
-    set('tasks', changes.tasks.map(task => String(task).replace(/\s+/g, ' ').trim().slice(0, 80)).filter(Boolean).slice(0, 10), '::text[]');
+  if (Array.isArray(changes.tasks) && !sameList(tidyTasks(changes.tasks), tidyTasks(current.tasks))) {
+    set('tasks', tidyTasks(changes.tasks), '::text[]');
+    edited.push('tasks');
   }
   const wordsChanged = sets.length > 0;
+  if (wordsChanged) {
+    params.push(edited);
+    sets.push(`edited = ARRAY(SELECT DISTINCT unnest(edited || $${params.length}::text[]))`);
+  }
   if (typeof changes.favorite === 'boolean') set('favorite', changes.favorite);
   if (changes.myStatus === '' || MY_STATUSES.includes(changes.myStatus)) set('my_status', changes.myStatus);
   if (!sets.length) return { link: await getLink(id), wordsChanged: false };
@@ -692,14 +817,25 @@ export async function bulkChange(ids, action, value = '') {
     const [tag] = normalizeTags([value], await knownTags());
     if (!tag) return { changed: 0, reword: [] };
     const { rows } = await query('SELECT id, tags, user_tags FROM links WHERE id = ANY($1)', [ids]);
+    const hasTag = tags => tags.some(other => tagKey(other) === tagKey(tag));
+    let changed = 0;
+    const reword = [];
     for (const row of rows) {
-      await query('UPDATE links SET tags = $2, user_tags = $3, updated_at = now() WHERE id = $1', [
-        row.id,
-        normalizeTags([...row.tags, tag]),
-        normalizeTags([...row.user_tags, tag]),
-      ]);
+      let tags = normalizeTags([...row.tags, tag]);
+      if (!hasTag(tags)) {
+        // The link's tags are full, so the new tag takes the place of the last one the AI added.
+        const own = row.user_tags.map(tagKey);
+        const last = row.tags.findLastIndex(other => !own.includes(tagKey(other)));
+        if (last < 0) continue; // all of them are your own tags: those are never dropped, so this link stays as it is
+        tags = normalizeTags([...row.tags.toSpliced(last, 1), tag]);
+      }
+      const userTags = normalizeTags([...row.user_tags, tag]);
+      if (sameList(tags, row.tags) && sameList(userTags, row.user_tags)) continue; // it's already your own tag here
+      await query('UPDATE links SET tags = $2, user_tags = $3, updated_at = now() WHERE id = $1', [row.id, tags, userTags]);
+      changed++;
+      if (!sameList(tags, row.tags)) reword.push(row.id);
     }
-    return { changed: rows.length, reword: rows.map(row => row.id) };
+    return { changed, reword };
   }
   return { changed: 0, reword: [] };
 }

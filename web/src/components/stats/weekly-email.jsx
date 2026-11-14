@@ -1,12 +1,14 @@
 // The "Weekly email" card at the end of the Stats page (owner only): whether the Monday email is on, where it goes,
 // when it last went out, and what this week's would hold. The switch and "Send test email" are in the ⋯ menu
 // (EmailMenu.jsx); this card shares its settings (the same 'email-settings' question to the server).
+// This file's default export makes it an "extra card" (see StatsPage.jsx); its styles are in changes.css, next to
+// the "This week" card it sits beside.
 import { useQuery } from '@tanstack/react-query';
 import { Mail } from 'lucide-react';
 import { api } from '../../api.js';
 import { fullDate } from '../../format.js';
-
-const plural = (n, one, many = `${one}s`) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+import { plural } from './shared.jsx';
+import './changes.css';
 
 export default function WeeklyEmailCard({ stats, owner }) {
   const settings = useQuery({ queryKey: ['email-settings'], queryFn: () => api('/email/settings'), enabled: owner, retry: false });
@@ -25,12 +27,15 @@ export default function WeeklyEmailCard({ stats, owner }) {
   return (
     <section className="stats-card stats-email" aria-labelledby="stats-email">
       <header className="stats-card-head stats-email-head">
-        <span className="stats-num-icon is-accent" aria-hidden="true">
+        <span className="stats-email-icon" aria-hidden="true">
           <Mail size={18} />
         </span>
         <div>
+          <p className="stats-kicker" aria-hidden="true">
+            Every Monday
+          </p>
           <h3 id="stats-email">Weekly email</h3>
-          <p>Every Monday morning: the week’s new prices, new features and links that stopped working.</p>
+          <p className="stats-card-sub">The week’s new prices, new features and links that stopped working.</p>
         </div>
         {status ? <span className={`stats-email-status${on && ready ? ' is-on' : ''}`}>{status}</span> : null}
       </header>

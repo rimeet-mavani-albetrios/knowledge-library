@@ -5,7 +5,7 @@
 // Props: `ids` (the links compared), `owner`, `loaded` (all links are on screen), `answer` (the AI's answer for
 // these links, or null), onAnswer(answer) (the window shows it), onEdit() (open the picker for these links).
 import { useEffect, useRef, useState } from 'react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useMutationState } from '@tanstack/react-query';
 import { Check, Link2, LoaderCircle, Plus, Sparkles } from 'lucide-react';
 import { api } from '../api.js';
 import { useToast } from './Toasts.jsx';
@@ -61,11 +61,21 @@ export default function CompareActions({ ids, owner, loaded, answer, onAnswer, o
   const toast = useToast();
   // The links asked about travel with the question: if you add or take out a link while the AI thinks,
   // its answer stays with the links it was about (and the window doesn't show it for the new set).
+  // (These answers arrive even when the window was closed meanwhile: the window keeps them for these links.)
   const pick = useMutation({
+    mutationKey: ['compare-pick'],
     mutationFn: asked => api('/compare/pick', { method: 'POST', body: { ids: asked } }),
     onSuccess: (result, asked) => onAnswer({ key: asked.join(','), ...result }),
     onError: error => toast({ title: 'No answer from the AI', description: error.message, tone: 'error' }),
   });
+  // A question about these same links still on its way, also one asked before the window was closed and opened
+  // again (the button starts fresh then): the button waits for it, so one click never asks twice.
+  const key = ids.join(',');
+  const asking = useMutationState({
+    filters: { mutationKey: ['compare-pick'], status: 'pending' },
+    select: mutation => (Array.isArray(mutation.state.variables) ? mutation.state.variables.join(',') : ''),
+  }).includes(key);
+  const thinking = pick.isPending || asking;
   return (
     <div className="compare-actions">
       <button
@@ -80,9 +90,9 @@ export default function CompareActions({ ids, owner, loaded, answer, onAnswer, o
       </button>
       <CopyLink />
       {owner && (
-        <button type="button" className="btn btn-ghost compare-ask" onClick={() => pick.mutate(ids)} disabled={pick.isPending || !loaded}>
-          {pick.isPending ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : <Sparkles size={16} aria-hidden="true" />}
-          {pick.isPending ? 'Thinking…' : answer ? 'Ask again' : 'Which should I pick?'}
+        <button type="button" className="btn btn-ghost compare-ask" onClick={() => pick.mutate(ids)} disabled={thinking || !loaded}>
+          {thinking ? <LoaderCircle size={16} className="spin" aria-hidden="true" /> : <Sparkles size={16} aria-hidden="true" />}
+          {thinking ? 'Thinking…' : answer ? 'Ask again' : 'Which should I pick?'}
         </button>
       )}
     </div>

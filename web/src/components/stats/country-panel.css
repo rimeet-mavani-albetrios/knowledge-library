@@ -1,0 +1,400 @@
+/* A country's profile (country-panel.jsx). The card it sits in (where.css) decides where it goes: over the list on a
+   wide card, a sheet under the globe on a phone. Inside: a head, tidy sections that scroll, and a button that stays. */
+
+.where-panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  container-type: inline-size; /* the link rows keep only the topic's icon: this panel is narrow */
+  scroll-margin-top: calc(var(--header-h) + 12px); /* scrolling to it stops below the top bar, so its name shows */
+  /* It rises into place under the globe; on a wide card it slides in from the right (the same animation, so a window
+     resized across the two layouts doesn't play it again). */
+  --panel-from: translateY(8px);
+  animation: where-panel-in 0.26s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+@keyframes where-panel-in {
+  from {
+    opacity: 0;
+    transform: var(--panel-from);
+  }
+}
+
+.cp-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0 16px 8px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* ---------- Head: big flag, name, its place among your countries ---------- */
+
+.cp-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 -16px;
+  padding: 14px 8px 12px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.cp-flag {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--surface-2);
+  font-size: 34px;
+  line-height: 1;
+}
+
+.cp-flag .flag-pill {
+  font-size: 22px;
+}
+
+.cp-flag.is-unknown {
+  color: var(--muted);
+}
+
+.cp-names {
+  flex: 1;
+  min-width: 0;
+}
+
+.cp-names h4 {
+  margin: 0;
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+.cp-names h4:focus {
+  outline: none;
+}
+
+.cp-names p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-close {
+  align-self: flex-start;
+}
+
+.cp-why {
+  margin: 12px 0 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+/* ---------- Sections ---------- */
+
+.cp-section {
+  margin-top: 16px;
+}
+
+.cp-title {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
+}
+
+.cp-quiet {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* What's from here: a colored icon and word, the number, a thin bar under them. */
+.cp-topics {
+  display: grid;
+  gap: 1px;
+  margin: 0 -8px;
+  padding: 0;
+  list-style: none;
+}
+
+.cp-topic {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 7px;
+  row-gap: 5px;
+  width: 100%;
+  padding: 6px 8px 7px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+
+@media (hover: hover) {
+  .cp-topic:hover {
+    background: var(--surface-2);
+  }
+}
+
+.cp-topic-icon {
+  color: var(--hue-ink);
+}
+
+.cp-topic-name {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cp-topic-count {
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-topic-track {
+  grid-column: 1 / -1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: 99px;
+  background: var(--surface-2);
+}
+
+.cp-topic-track span {
+  display: block;
+  height: 100%;
+  min-width: 4px;
+  border-radius: inherit;
+  background: var(--hue);
+}
+
+@media (hover: hover) {
+  .cp-topic:hover .cp-topic-track {
+    background: var(--line);
+  }
+}
+
+/* Price: a slim split bar with its words under it. */
+.cp-price-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+  margin-bottom: 9px;
+}
+
+.cp-price-part {
+  flex-basis: 0;
+  min-width: 4px;
+  border-radius: 2px;
+}
+
+.cp-price-part:first-child {
+  border-radius: 99px 2px 2px 99px;
+}
+
+.cp-price-part:last-child {
+  border-radius: 2px 99px 99px 2px;
+}
+
+.cp-price-part:only-child {
+  border-radius: 99px;
+}
+
+.cp-price-words {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-2);
+  font-size: 12.5px;
+}
+
+.cp-price-words li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cp-price-words strong {
+  color: var(--text);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-price-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 3px;
+}
+
+.is-free:is(.cp-price-part, .cp-price-dot) {
+  background: var(--success);
+}
+
+.is-open-source:is(.cp-price-part, .cp-price-dot) {
+  background: color-mix(in oklab, var(--success) 62%, var(--accent));
+}
+
+.is-freemium:is(.cp-price-part, .cp-price-dot) {
+  background: var(--accent);
+}
+
+.is-paid:is(.cp-price-part, .cp-price-dot) {
+  background: var(--warning);
+}
+
+.is-unknown:is(.cp-price-part, .cp-price-dot) {
+  background: var(--line-strong);
+}
+
+/* Companies: their names as small tags, with a count when there are more links from one. */
+.cp-companies {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cp-companies li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 26px;
+  padding: 2px 9px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  font-size: 12.5px;
+  font-weight: 550;
+}
+
+.cp-company-name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.cp-company-count {
+  color: var(--muted);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-companies .cp-company-more {
+  background: none;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* Opened, favorites, trust: one quiet line between two thin rules. */
+.cp-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 16px 0 0;
+  padding: 9px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  list-style: none;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.cp-facts li {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cp-facts strong {
+  color: var(--text-2);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.cp-links {
+  margin: 0 -8px;
+}
+
+/* The button at the bottom stays in sight while the sections scroll. */
+.cp-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  flex: none;
+  padding: 10px 12px 12px;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 var(--radius) var(--radius);
+}
+
+.cp-all {
+  width: 100%;
+  justify-content: center;
+}
+
+/* On a phone that button sits at the bottom of the screen, so "back to top" steps up above it. */
+@media (max-width: 900px) {
+  body:has(.where-panel) .to-top {
+    bottom: 84px;
+  }
+}
+
+/* ---------- Loading ---------- */
+
+.cp-bone-title {
+  width: 96px;
+  height: 10px;
+  margin-bottom: 12px;
+}
+
+.cp-bone-topic {
+  height: 8px;
+  margin: 0 0 22px;
+}
+
+.cp-bone-bar {
+  height: 8px;
+  margin-bottom: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .where-panel {
+    animation: none;
+  }
+}

@@ -6,6 +6,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  margin-bottom: 12px;
+}
+
+.fact-popular-head .fact-card-title {
+  margin: 0;
 }
 
 .fact-empty {
@@ -15,16 +20,10 @@
   line-height: 1.5;
 }
 
-.fact-source {
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
 .fact-countries-note {
   margin: 0 0 6px;
   color: var(--text-2);
-  font-size: 13px;
+  font-size: 13.5px;
 }
 
 .fact-rising {
@@ -33,28 +32,21 @@
   font-weight: 600;
 }
 
+/* The one big number of the card, like the other cards have. */
 .fact-popular-world,
 .fact-youtube-count {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 0 12px;
+  margin: 0 0 10px;
   color: var(--text-2);
-  font-size: 15px;
-}
-
-.fact-popular-world svg,
-.fact-youtube-count svg {
-  flex: none;
-  color: var(--accent);
+  font-size: 14.5px;
 }
 
 .fact-popular-world strong,
 .fact-youtube-count strong {
   color: var(--text);
   font-family: var(--display);
-  font-size: 17px;
+  font-size: 22px;
   font-weight: 650;
+  letter-spacing: -0.015em;
 }
 
 /* One row per country: place, flag, name, a bar (best country = full) and its rank there. */
@@ -68,7 +60,7 @@
 
 .fact-countries li {
   display: grid;
-  grid-template-columns: 18px 24px minmax(0, 1fr) minmax(48px, 30%) auto;
+  grid-template-columns: 18px 28px minmax(0, 1fr) minmax(48px, 30%) auto;
   align-items: center;
   gap: 10px;
   min-height: 34px;
@@ -125,8 +117,8 @@
 /* YouTube: a small picture per video, its title (2 lines at most), channel and views. */
 .fact-videos {
   display: grid;
-  gap: 4px;
-  margin: 0;
+  gap: 2px;
+  margin: 0 -8px;
   padding: 0;
   list-style: none;
 }
@@ -136,7 +128,7 @@
   grid-template-columns: 112px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
-  padding: 6px;
+  padding: 6px 8px;
   border-radius: var(--radius);
   color: inherit;
   text-decoration: none;
@@ -191,6 +183,18 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  margin-top: 10px;
+  color: var(--accent-text);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+@media (hover: hover) {
+  .fact-more:hover {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
 }
 
 @media (hover: hover) {

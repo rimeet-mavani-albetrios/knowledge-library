@@ -6,14 +6,15 @@ import * as links from './links.js';
 import { kick, choresIfDue, refreshFingerprint } from './worker.js';
 import { embedQuery, toSqlVector } from './robot/embed.js';
 import { findUrls } from './robot/url.js';
-import { aiState, pickWithAi, AiPaused } from './robot/ai.js';
+import { aiState, pickWithAi, AiPaused, AiUnclear } from './robot/ai.js';
 import { exportLinks } from './export.js';
-import { libraryMap } from './map.js';
+import { homeMap, libraryMap } from './map.js';
 import { fixSpelling } from './words.js';
 import { factsRoutes } from './routes/facts.js';
 import { stats } from './routes/stats.js';
 import { cron } from './routes/cron.js';
 import { email } from './routes/email.js';
+import { checkUrls, duplicatesRoutes } from './duplicates.js';
 
 export const api = express.Router();
 const MAX_LINKS_PER_ADD = 1000;
@@ -102,6 +103,21 @@ api.get('/links', requireReader, async (req, res) => {
   res.json({ ...page, total, closestOnly: false });
 });
 
+// The ids of every link in the view (the same search, filters and order as the list above), not only the 24 loaded.
+async function viewIds(req) {
+  const filters = readFilters(req.query);
+  const { q } = await searchText(req);
+  if (q) return links.searchIds({ q, vector: await queryVector(q), filters });
+  const sort = links.SORTS.includes(req.query.sort) ? req.query.sort : 'newest';
+  return links.listIds({ filters, sort });
+}
+
+// Select mode's "Select all", so a change reaches the links that aren't loaded yet too.
+// (Before /links/:id, which would take "ids" for a link's id.)
+api.get('/links/ids', requireOwner, async (req, res) => {
+  res.json(await viewIds(req));
+});
+
 api.get('/facets', requireReader, async (req, res) => {
   const { q } = await searchText(req);
   res.json(await links.facets({ q, vector: q ? await queryVector(q) : null, filters: readFilters(req.query) }));
@@ -118,9 +134,20 @@ api.get('/suggest', requireReader, async (req, res) => {
   res.json(await links.suggest(q));
 });
 
-// Dots for the knowledge map at the top of the page.
+// The small map at the top of the page: its land, its dots, and where to write the island names.
 api.get('/map', requireReader, async (req, res) => {
-  res.json({ points: await libraryMap() });
+  res.json(await homeMap());
+});
+
+// The map's bright dots: every link of a search or filter. Only ids, and anyone who may read the list can page through
+// them anyway.
+api.get('/map/lit', requireReader, async (req, res) => {
+  res.json(await viewIds(req));
+});
+
+// The Explore page's big map: the same dots, each one's closest links, the land in more detail, and the island and topic names.
+api.get('/map/explore', requireReader, async (req, res) => {
+  res.json(await libraryMap());
 });
 
 // Live status of links the robot is working on.
@@ -162,6 +189,8 @@ api.post('/compare/pick', requireOwner, async (req, res) => {
   try {
     res.json(await pickWithAi(picked));
   } catch (err) {
+    // An answer that names no clear pick: the AI service worked, its answer didn't (502), so "try again" fits.
+    if (err instanceof AiUnclear) return res.status(502).json({ error: err.message });
     if (!(err instanceof AiPaused)) throw err;
     const minutes = Math.max(1, Math.ceil((err.until - Date.now()) / 60_000));
     res.status(503).json({
@@ -203,11 +232,13 @@ api.post('/links', requireOwner, async (req, res) => {
   res.status(result.added.length ? 201 : 200).json(result);
 });
 
-// Before adding: which of the links you pasted are already saved, so the list can say so.
+// Before adding: which of the links you pasted are already saved, and which are the same page or the same website
+// as links you have, so the list can say so (duplicates.js).
 api.post('/links/check', requireOwner, async (req, res) => {
   const urls = (Array.isArray(req.body?.urls) ? req.body.urls : []).filter(url => typeof url === 'string').slice(0, MAX_LINKS_PER_ADD);
-  res.json({ saved: await links.savedUrls(urls) });
+  res.json(await checkUrls(urls));
 });
+api.use(duplicatesRoutes); // the owner's "Find duplicates" window: /duplicates, /duplicates/keep, /duplicates/merge
 
 api.patch('/links/:id', requireOwner, async (req, res) => {
   const changes = { ...req.body };
@@ -221,7 +252,8 @@ api.patch('/links/:id', requireOwner, async (req, res) => {
 
 // Many links at once: { ids, action: 'tag' | 'collection' | 'refresh' | 'delete', value }.
 api.post('/links/bulk', requireOwner, async (req, res) => {
-  const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter(id => typeof id === 'string').slice(0, MAX_LINKS_PER_ADD);
+  // As many as one "Select all" can pick (links.MAX_BULK), so every selected link changes.
+  const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).filter(id => typeof id === 'string').slice(0, links.MAX_BULK);
   const action = req.body?.action;
   if (!ids.length || !links.BULK_ACTIONS.includes(action)) return res.status(400).json({ error: 'Choose some links and what to do with them.' });
   const value = String(req.body?.value ?? '');

@@ -42,7 +42,7 @@
 .watch-changes li {
   display: grid;
   grid-template-columns: 96px minmax(0, 8rem) minmax(0, 1fr);
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   padding: 7px 0;
   border-bottom: 1px solid var(--line);
@@ -100,9 +100,9 @@
 
 /* The plans as they are now: small boxes side by side. */
 .watch-subhead {
-  margin: 16px 0 8px;
-  color: var(--muted);
-  font-size: 12.5px;
+  margin: 14px 0 8px;
+  color: var(--text-2);
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -116,9 +116,8 @@
 .watch-plans div {
   min-width: 0;
   padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
+  border-radius: 10px;
+  background: var(--surface-2);
 }
 
 .watch-plans dt {
@@ -175,7 +174,7 @@
 .watch-new svg {
   flex: none;
   align-self: center;
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .watch-new-name {
@@ -184,24 +183,17 @@
   font-weight: 500;
 }
 
-.watch-list {
+.watch-more {
   margin-top: 12px;
-  font-size: 13.5px;
 }
 
-.watch-list summary {
-  width: fit-content;
-  color: var(--accent-text);
-  font-weight: 500;
-  cursor: pointer;
-}
-
-.watch-list ul {
+.watch-list {
   columns: 2 180px;
   column-gap: 20px;
-  margin: 8px 0 0;
-  padding-left: 18px;
+  margin: 10px 0 0;
+  padding: 0 0 0 18px;
   color: var(--text-2);
+  font-size: 13.5px;
   line-height: 1.6;
 }
 

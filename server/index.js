@@ -28,7 +28,8 @@ app.use((req, res, next) => {
   if (!DEV) {
     res.setHeader(
       'content-security-policy',
-      "default-src 'self'; img-src * data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'",
+      // frame-src: the History tab's "Look back" shows the Internet Archive's old copy of a website inside the window.
+      "default-src 'self'; img-src * data: blob:; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self'; frame-src https://web.archive.org; frame-ancestors 'none'; base-uri 'self'",
     );
   }
   next();

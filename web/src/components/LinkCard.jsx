@@ -21,7 +21,7 @@ const QUICK_LOAD = 100; // a picture that arrives this fast (from the browser's 
 // and site icons that didn't load (a wrong address, a blocked image). They're remembered on this device, so next
 // time the colored band (or the category's icon) shows straight away, instead of trying again and swapping.
 const badPictures = rememberedList('kl-bad-pictures');
-const badIcons = rememberedList('kl-bad-icons');
+export const badIcons = rememberedList('kl-bad-icons');
 // Pictures already loaded once on this page: they show at once when you come back to them, without fading in again.
 const loadedPictures = new Set();
 
@@ -216,7 +216,8 @@ export function SiteIcon({ link, className = 'row-icon', big = false, children }
       ) : link.source === 'github' ? (
         <GitHubIcon size={big ? 24 : 20} />
       ) : link.iconUrl && !failed ? (
-        <img src={link.iconUrl} alt="" width={img} height={img} loading="lazy" referrerPolicy="no-referrer" onError={broke} />
+        // `is-loaded`: the dark theme's light square shows only behind an icon that's there (views.css).
+        <img src={link.iconUrl} alt="" width={img} height={img} loading="lazy" referrerPolicy="no-referrer" onError={broke} onLoad={event => event.currentTarget.classList.add('is-loaded')} />
       ) : (
         <Icon size={big ? 22 : 19} />
       )}

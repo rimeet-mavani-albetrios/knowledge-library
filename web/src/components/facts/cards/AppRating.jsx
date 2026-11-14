@@ -9,7 +9,7 @@ export const order = 20;
 export function glance(facts) {
   const ios = facts.app?.ios;
   if (!ios?.rating) return null;
-  return { icon: Smartphone, text: `${ios.rating.toFixed(1)} on iPhone`, tab: 'popularity', tone: ios.rating >= 4.5 ? 'good' : ios.rating < 3.5 ? 'warn' : undefined };
+  return { icon: Smartphone, label: 'iPhone app', value: ios.rating.toFixed(1), note: 'of 5', rank: 20, spare: true, tab: 'popularity', tone: ios.rating >= 4.5 ? 'good' : ios.rating < 3.5 ? 'warn' : undefined };
 }
 
 function Stars({ rating }) {

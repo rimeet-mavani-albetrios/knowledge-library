@@ -9,17 +9,20 @@
 //      saves Claude's answers the normal way (history, trust grade and all)
 //
 // Without FACTS_AI, "ai" asks the free AI as usual. YouTube is left out: Google allows about 80 links a day.
+// One kind's name fills just that kind: `node --env-file=.env server/scripts/fill-facts.js place` works out every
+// link's country (quick, no AI; GitHub owners a few an hour, the rest wait for the background robot).
 // AT_ONCE (default 10) is how many links are checked at the same time.
 import { loadKinds, runFacts } from '../facts/runner.js';
 
 const step = process.argv[2];
-if (!['all', 'free', 'ai'].includes(step)) {
-  console.error('Say which facts: all, free (no AI) or ai.');
+const kinds = (await loadKinds()).filter(kind => kind.kind !== 'youtube');
+const single = kinds.find(kind => kind.kind === step);
+if (!['all', 'free', 'ai'].includes(step) && !single) {
+  console.error(`Say which facts: all, free (no AI), ai, or one kind (${kinds.map(kind => kind.kind).join(', ')}).`);
   process.exit(1);
 }
 
-const kinds = (await loadKinds()).filter(kind => kind.kind !== 'youtube');
-const only = kinds.filter(kind => step === 'all' || (step === 'ai') === Boolean(kind.ai)).map(kind => kind.kind);
+const only = single ? [single.kind] : kinds.filter(kind => step === 'all' || (step === 'ai') === Boolean(kind.ai)).map(kind => kind.kind);
 console.log(`Filling ${only.join(', ')}${process.env.FACTS_AI ? ` (AI: ${process.env.FACTS_AI})` : ''}…`);
 
 const started = Date.now();

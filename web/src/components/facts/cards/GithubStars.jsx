@@ -5,6 +5,12 @@ import { compactNumber, fullDate } from '../../../format.js';
 export const tab = 'popularity';
 export const order = 10;
 
+// A GitHub project's stars are known before the facts arrive (the list already has them), so this tile never waits.
+export function glance(facts, link) {
+  if (link?.source !== 'github' || !Number.isFinite(link.github?.stars)) return null;
+  return { icon: Star, label: 'GitHub stars', value: compactNumber(link.github.stars), rank: 5, tab: 'popularity' };
+}
+
 const W = 560;
 const H = 120;
 const PAD = 6;

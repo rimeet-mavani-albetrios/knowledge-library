@@ -1,4 +1,5 @@
-/* The world map (WorldMap.jsx): grey land, and five shades of teal for the countries that have a number. */
+/* The world map (WorldMap.jsx): grey land, and five shades of teal for the countries that have a number.
+   Small countries get a round bubble; the `selected` country gets an outline. */
 
 .world-map {
   --wm-0: #e3e7ef;
@@ -13,7 +14,7 @@
 }
 
 :root[data-theme='dark'] .world-map {
-  --wm-0: #272d47;
+  --wm-0: #262930;
   --wm-1: #18484c;
   --wm-2: #1b6a63;
   --wm-3: #209080;
@@ -55,7 +56,33 @@
 }
 
 .wm-dot {
-  stroke-width: 1.4;
+  /* The bubble's edge stays 1.5 pixels at any map size, so bubbles stand apart from the land under them. */
+  stroke-width: 1.5px;
+  vector-effect: non-scaling-stroke;
+}
+
+/* A bubble pushed aside (so it doesn't cover a neighbour) keeps a thin line back to its country. */
+.wm-leader {
+  stroke: var(--muted);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+/* The chosen country: a dark outline drawn on top of its neighbours, the same width at any map size. */
+.wm-picked {
+  fill: none;
+  stroke: var(--text);
+  stroke-width: 2px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.wm-dot.is-picked {
+  stroke: var(--text);
+  stroke-width: 2.5px;
 }
 
 .wm-s0 {
@@ -88,6 +115,10 @@
     cursor: pointer;
     filter: brightness(1.08);
   }
+
+  .wm-dot:hover {
+    stroke: var(--text);
+  }
 }
 
 .wm-svg :focus {
@@ -97,6 +128,10 @@
 .wm-svg :focus-visible {
   stroke: var(--accent);
   stroke-width: 2;
+}
+
+.wm-svg .wm-dot:focus-visible {
+  stroke-width: 2.5px;
 }
 
 /* The label that follows the mouse: the app's tooltip look (ink color), above the pointer. */
@@ -123,6 +158,13 @@
 
 .wm-tip-name {
   font-weight: 650;
+}
+
+/* The two-letter label (where flags can't be drawn) on the dark label: outlined in the label's own text color. */
+.wm-tip .flag-pill {
+  border-color: color-mix(in oklab, currentColor 45%, transparent);
+  background: transparent;
+  color: inherit;
 }
 
 .wm-tip-value {

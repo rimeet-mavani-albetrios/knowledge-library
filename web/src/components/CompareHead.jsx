@@ -177,10 +177,8 @@ export function PickThisOne({ link, owner, onClose, className = '' }) {
 
   const pick = () => {
     const before = link.myStatus ?? '';
-    // The window closes straight away, so the error comes from the promise: it still arrives after the close.
-    update
-      .mutateAsync({ link, changes: { myStatus: 'using' } })
-      .catch(error => toast({ title: `Couldn't mark ${link.title} as Using`, description: error.message, tone: 'error' }));
+    // The window closes straight away. If saving fails, useUpdateLink still says so after the close.
+    update.mutate({ link, changes: { myStatus: 'using' } });
     toast({
       title: `Marked ${link.title} as Using`,
       tone: 'success',

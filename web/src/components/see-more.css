@@ -1,0 +1,83 @@
+/* SeeMore.jsx: one calm pill button for "show more", and a part that slides open under it. */
+
+.see-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 99px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: background-color 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+@media (hover: hover) {
+  .see-more:hover {
+    background: var(--surface-2);
+    border-color: var(--muted);
+  }
+
+  .see-more:hover .see-more-chevron {
+    color: var(--text);
+  }
+}
+
+.see-more:active {
+  transform: scale(0.98);
+}
+
+/* A long name on a narrow phone wraps instead of running out of the card. */
+@media (max-width: 400px) {
+  .see-more {
+    max-width: 100%;
+    height: auto;
+    min-height: 34px;
+    padding-block: 6px;
+    white-space: normal;
+    text-align: left;
+  }
+}
+
+.see-more-chevron {
+  flex: none;
+  color: var(--muted);
+  transition: transform 0.25s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.see-more.is-open .see-more-chevron {
+  transform: rotate(180deg);
+}
+
+.reveal {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition: grid-template-rows 0.28s cubic-bezier(0.2, 0.7, 0.2, 1), opacity 0.2s;
+}
+
+.reveal.is-open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.reveal-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .see-more,
+  .see-more-chevron,
+  .reveal {
+    transition: none;
+  }
+
+  .see-more:active {
+    transform: none;
+  }
+}

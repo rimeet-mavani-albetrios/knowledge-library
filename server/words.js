@@ -22,11 +22,33 @@ const STOP_WORDS = new Set(`
 const WEAK_WORDS = new Set('tool tools website websites site sites app apps online best good make makes making create creates creating'.split(' '));
 export const isWeak = word => WEAK_WORDS.has(word);
 
+// Everyday ways to say a thing, and the words your saved websites use for it. Without this, "run AI on my own computer"
+// looks for "computer" and finds "cloud computer" tools, while the websites that fit say "locally" or "offline".
+// The website words are one "word" of the search, so having two of them doesn't count double (see `term` in links.js).
+// (Not "my own machine learning model" or "control my computer": those are about something else.)
+const SAME_MEANING = [
+  [/\b(?:(?:on|in|from) (?:my|your)|own) (?:computer|laptop|pc|mac|macbook|machine|desktop|hardware)\b(?! (?:learning|vision|science|use|apps?|games?)\b)/g, 'local|offline|self hosted'],
+  [/\b(?:without|no) (?:internet|wifi)\b/g, 'local|offline|self hosted'],
+];
+
 // "Convert PDF to Excel!" → ['convert', 'pdf', 'excel']. If every word is a stop word, they're kept.
 export function searchWords(text) {
-  const all = (String(text).toLowerCase().match(/[a-z0-9]+/g) ?? []).filter(word => word.length > 1 || /\d/.test(word));
+  const same = [];
+  let rest = String(text).toLowerCase();
+  for (const [says, means] of SAME_MEANING) {
+    rest = rest.replace(says, () => {
+      same.push(means);
+      return ' ';
+    });
+  }
+  const all = (rest.match(/[a-z0-9]+/g) ?? []).filter(word => word.length > 1 || /\d/.test(word));
   const meaningful = all.filter(word => !STOP_WORDS.has(word));
-  return [...new Set(meaningful.length ? meaningful : all)].slice(0, 10);
+  return [...new Set([...(meaningful.length || same.length ? meaningful : all), ...same])].slice(0, 10);
+}
+
+// The text for the search's meaning fingerprint: what you typed, plus the website words.
+export function withSameMeaning(text) {
+  return SAME_MEANING.reduce((all, [says, means]) => all.replace(says, found => `${found} ${means.replaceAll('|', ' ')}`), text);
 }
 
 // ---------- Spelling ----------
@@ -78,10 +100,11 @@ function distance(a, b, max) {
   return previous[b.length];
 }
 
-// "videos" is fine when the library says "video", and "ollam" is fine while you're still typing "ollama".
+// "videos" is fine when the library says "video", "ollam" is fine while you're still typing "ollama",
+// and "meteor" is fine as a part of "mailmeteor". (Only from 5 letters: a shorter part is more often a typo, like "emal".)
 function looksKnown(word, words) {
   if (words.has(word) || words.has(`${word}s`) || words.has(word.replace(/e?s$/, ''))) return true;
-  for (const known of words.keys()) if (known.startsWith(word)) return true;
+  for (const known of words.keys()) if (known.startsWith(word) || (word.length >= 5 && known.includes(word))) return true;
   return false;
 }
 

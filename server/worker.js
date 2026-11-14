@@ -20,6 +20,9 @@ const MAX_ATTEMPTS = 3;
 const MAX_CONTENT = 24_000; // letters of page text saved for search
 const UPGRADES_PER_ROUND = 20;
 const SOURCE_TAGS = { github: 'GitHub', youtube: 'YouTube' };
+// A quiet run asks the AI only when one of these is empty. Not quick_start: the AI leaves it empty when the page doesn't
+// say how to begin (more than half of all links), and asking again for those would use up the free limit for nothing.
+const FILLED_BY_AI = ['title', 'summary', 'use_for', 'features', 'category', 'tags', 'pricing', 'overview', 'tasks', 'audience', 'level', 'search_words'];
 let running = 0;
 let upgrading = false;
 let lastChores = 0;
@@ -45,13 +48,20 @@ async function work() {
   }
 }
 
+// The SQL that writes one of the fields that say what a link is (the ones the AI writes and you can edit).
+// A field you edited is never written: the database checks this in the same step, so an edit made while the robot was
+// reading counts too. With `fillOnly` (a quiet run) it writes only into an empty field: '' or an empty list.
+const describedField = (column, value, fillOnly = false) =>
+  `${column} = CASE WHEN '${column}' <> ALL(edited)${fillOnly ? ` AND to_jsonb(${column}) IN ('""', '[]')` : ''} THEN ${value} ELSE ${column} END`;
+
 async function save(id, fields) {
-  const sets = Object.keys(fields).map((column, i) => `${column} = $${i + 2}`);
+  const sets = Object.keys(fields).map((column, i) => (column === 'title' ? describedField(column, `$${i + 2}`) : `${column} = $${i + 2}`));
   await query(`UPDATE links SET ${sets.join(', ')}, updated_at = now() WHERE id = $1`, [id, ...Object.values(fields)]);
 }
 
-// `quiet` is for links that are already in the library and only get the newest details:
-// their card stays as it is while the robot works, and a good AI description is never replaced by a worse one.
+// `quiet` is for links that are already in the library and only get the newest details: their card stays as it is while
+// the robot works. A quiet run may change only what comes from reading the page. It never replaces the description of a
+// link (the name, summary, tasks, category, tags…), it only fills in what's empty, so it asks the AI only for that.
 async function processLink(row, { quiet = false } = {}) {
   try {
     // 1. Read the website: the page plus up to 3 useful pages of it (and GitHub details for repositories).
@@ -67,7 +77,7 @@ async function processLink(row, { quiet = false } = {}) {
       return;
     }
     const host = hostOf(page.finalUrl || row.url);
-    const siteName = isRepo ? 'GitHub' : page.siteName || host;
+    const siteName = isRepo ? 'GitHub' : page.siteName || (quiet && row.site_name) || host;
     const extra = page.extra ?? [];
     const link = {
       url: row.url,
@@ -108,7 +118,7 @@ async function processLink(row, { quiet = false } = {}) {
     let described = { title: link.title, ...basicDescription(link, text) };
     let aiStatus = aiEnabled() ? 'pending' : 'basic';
     let error = '';
-    if (aiEnabled()) {
+    if (aiEnabled() && (!quiet || FILLED_BY_AI.some(column => row[column]?.length === 0 && !row.edited.includes(column)))) {
       try {
         const answer = await describeWithAi({ ...link, text, extra, knownTags: known });
         described = { ...answer, title: answer.title || link.title, summary: answer.summary || described.summary };
@@ -123,45 +133,38 @@ async function processLink(row, { quiet = false } = {}) {
         }
       }
     }
-    // A quiet update only adds details. It keeps the name, summary, category and tags the link already has
-    // (you may have edited them), except when the AI now writes the first real description of a link.
-    if (quiet && (aiStatus !== 'done' || row.ai_status === 'done')) {
-      described = {
-        ...described,
-        title: row.title,
-        summary: row.summary,
-        useFor: row.use_for,
-        features: row.features,
-        category: row.category,
-        pricing: row.pricing,
-        tags: [...row.tags, ...(aiStatus === 'done' ? described.tags : [])],
-      };
-      if (aiStatus !== 'done') {
-        aiStatus = row.ai_status;
-        error = row.error;
-      }
-    }
     const sourceTag = SOURCE_TAGS[row.source];
     const tags = normalizeTags([...(row.user_tags ?? []), ...described.tags, ...(sourceTag ? [sourceTag] : [])], known);
-    const full = { ...link, ...described, tags, collection: row.collection, note: row.note };
+    // A quiet run keeps what the page doesn't say this time: a busy GitHub or a thin page wipes nothing.
+    const kept = (fresh, old) => (quiet && (!fresh || fresh.length === 0) ? old : fresh);
+    const github = kept(link.github, row.github);
 
-    // 3. Meaning fingerprint for smart search, then save everything.
-    const vector = toSqlVector(await embed(meaningText(full)));
-    await query(
-      `UPDATE links SET title = $2, description = $3, site_name = $4, author = $5, image_url = $6, icon_url = $7, github = $8,
-         health = $9, summary = $10, use_for = $11, features = $12, category = $13, tags = $14, pricing = $15, overview = $16,
-         tasks = $17, audience = $18, quick_start = $19, level = $20, search_words = $21, headings = $22, page_links = $23,
-         pages_read = $24, content = $25, embedding = $26::vector, ai_status = $27, error = $28, attempts = attempts + $29,
-         status = 'ready', robot_version = $30, updated_at = now()
-       WHERE id = $1`,
+    // 3. Save everything. The database decides which described fields are written (see describedField).
+    const fields = {
+      title: '$2', summary: '$10', use_for: '$11', features: '$12::jsonb', category: '$13', tags: '$14::text[]', pricing: '$15',
+      overview: '$16', tasks: '$17::text[]', audience: '$18', quick_start: '$19::text[]', level: '$20', search_words: '$21::text[]',
+    };
+    const { rows: [saved] } = await query(
+      `UPDATE links SET ${Object.entries(fields).map(([column, value]) => describedField(column, value, quiet)).join(', ')},
+         description = $3, site_name = $4, author = $5, image_url = $6, icon_url = $7, github = $8, health = $9,
+         headings = $22, page_links = $23, pages_read = $24, content = $25, ai_status = $26, error = $27,
+         attempts = attempts + $28, robot_version = $29, updated_at = now()
+       WHERE id = $1 RETURNING *`,
       [
-        row.id, full.title, full.description, full.siteName, full.author, full.imageUrl, full.iconUrl,
-        full.github ? JSON.stringify(full.github) : null, full.health, full.summary, full.useFor, JSON.stringify(full.features),
-        full.category, tags, full.pricing, full.overview ?? '', full.tasks ?? [], full.audience ?? '', full.quickStart ?? [],
-        full.level ?? '', full.searchWords ?? [], full.headings, JSON.stringify(full.pageLinks), JSON.stringify(full.pagesRead),
-        content, vector, aiStatus, error, quiet ? 0 : 1, ROBOT_VERSION,
+        row.id, described.title, kept(link.description, row.description), link.siteName, kept(link.author, row.author),
+        kept(link.imageUrl, row.image_url), kept(link.iconUrl, row.icon_url), github ? JSON.stringify(github) : null, link.health,
+        described.summary, described.useFor, JSON.stringify(described.features), described.category, tags, described.pricing,
+        described.overview ?? '', described.tasks ?? [], described.audience ?? '', described.quickStart ?? [], described.level ?? '',
+        described.searchWords ?? [], kept(link.headings, row.headings), JSON.stringify(kept(link.pageLinks, row.page_links)),
+        JSON.stringify(kept(link.pagesRead, row.pages_read)), kept(content, row.content), quiet ? row.ai_status : aiStatus,
+        quiet ? row.error : error, quiet ? 0 : 1, ROBOT_VERSION,
       ],
     );
+    if (!saved) return; // you deleted the link while the robot was reading it
+
+    // 4. Meaning fingerprint for smart search, from the words really saved (with your edits). Now the link is ready.
+    const vector = toSqlVector(await embed(meaningText(toLink(saved))));
+    await query(`UPDATE links SET embedding = $2::vector, status = 'ready', updated_at = now() WHERE id = $1`, [row.id, vector]);
   } catch (err) {
     console.error(`Could not process ${row.url}:`, err);
     if (quiet) await query('UPDATE links SET robot_version = $2 WHERE id = $1', [row.id, ROBOT_VERSION]);

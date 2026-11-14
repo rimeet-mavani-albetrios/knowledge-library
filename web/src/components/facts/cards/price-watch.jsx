@@ -1,7 +1,7 @@
 // "Price watch" on the History tab: the price changes found so far (newest first) and the plans as they are now.
 // The robot reads the pricing page once a month (server/facts/kinds/prices.js). Its first visit is the starting
 // point, so the list of changes starts empty. A rise in the last 30 days also shows as a chip at the top.
-import { TrendingUp, TrendingDown, ExternalLink } from 'lucide-react';
+import { CircleDollarSign, TrendingUp, TrendingDown, ExternalLink } from 'lucide-react';
 import { fullDate, hostOf } from '../../../format.js';
 import './watch.css';
 
@@ -32,7 +32,7 @@ const priceText = plan => (plan.price === null ? 'Custom' : plan.price === 0 ? '
 const recentRise = prices => (prices?.upAt && Date.now() - new Date(prices.upAt) < 30 * DAY ? prices.upAt : null);
 
 export function glance(facts) {
-  return recentRise(facts?.prices) ? { icon: TrendingUp, text: 'Price went up', tab: 'history', tone: 'warn' } : null;
+  return recentRise(facts?.prices) ? { icon: TrendingUp, label: 'Price', value: 'Went up', rank: 60, tab: 'history', tone: 'warn' } : null;
 }
 
 export default function PriceWatch({ facts, history }) {
@@ -43,8 +43,10 @@ export default function PriceWatch({ facts, history }) {
   const rise = recentRise(prices);
 
   return (
-    <section className="detail-section watch">
-      <h3>Price watch</h3>
+    <section className="fact-card watch">
+      <h3 className="fact-card-title">
+        <CircleDollarSign size={14} aria-hidden="true" /> Price watch
+      </h3>
       {rise ? (
         <p className="watch-alert">
           <TrendingUp size={15} aria-hidden="true" /> Price went up on {fullDate(rise)}

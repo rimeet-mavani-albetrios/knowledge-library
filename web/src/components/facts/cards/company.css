@@ -1,0 +1,8 @@
+/* The Company card (Company.jsx). The card frame and the label/value rows come from ../facts.css; this is only the
+   quiet note after the country that says where it came from ("same website as doubletick.io"). */
+
+.fact-where-from {
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 400;
+}

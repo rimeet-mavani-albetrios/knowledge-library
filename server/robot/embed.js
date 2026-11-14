@@ -3,6 +3,7 @@
 // Texts with a similar meaning get similar numbers, so "edit videos" can find "video editor".
 import { env, pipeline } from '@huggingface/transformers';
 import { settings } from '../config.js';
+import { withSameMeaning } from '../words.js';
 
 env.cacheDir = settings.modelCacheDir;
 
@@ -22,7 +23,7 @@ export async function embed(text) {
 export async function embedQuery(text) {
   const key = text.trim().toLowerCase();
   if (recentQueries.has(key)) return recentQueries.get(key);
-  const vector = await embed(key);
+  const vector = await embed(withSameMeaning(key));
   recentQueries.set(key, vector);
   if (recentQueries.size > 200) recentQueries.delete(recentQueries.keys().next().value);
   return vector;

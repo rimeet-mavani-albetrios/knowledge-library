@@ -6,7 +6,7 @@ export const order = 20;
 
 export function glance(facts) {
   const count = facts.trackers?.count;
-  return count >= 8 ? { icon: Radar, text: `${count} trackers`, tab: 'trust', tone: 'warn' } : null;
+  return count >= 8 ? { icon: Radar, label: 'Trackers', value: `${count} found`, rank: 35, tab: 'trust', tone: 'warn' } : null;
 }
 
 export default function Trackers({ facts }) {

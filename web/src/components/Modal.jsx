@@ -10,6 +10,25 @@ import './modal.css';
 
 const CLOSE_MS = 160; // the fade-out time (modal.css)
 
+// When a window closes, the browser puts the focus back on what had it before. A window opened from another window
+// that has gone by then (the compare picker hands over to the compare window) has nothing to go back to, so the
+// focus would be lost at the top of the page: it goes to what opened that other window instead, or (opened again on
+// the way back from another window) to where this window came from the last time.
+const cameFrom = new WeakMap(); // window → what had the focus before it opened, nearest first
+function rememberFocus(dialog) {
+  const from = document.activeElement;
+  const places = [from, ...(cameFrom.get(from?.closest?.('dialog')) ?? []), ...(cameFrom.get(dialog) ?? [])];
+  cameFrom.set(dialog, [...new Set(places)].slice(0, 6));
+}
+function giveFocusBack(dialog) {
+  const now = document.activeElement;
+  if (now && now !== document.body && !dialog.contains(now)) return; // the browser has done it
+  const back = cameFrom.get(dialog)?.find(
+    element => element.isConnected && element !== document.body && !element.closest('dialog:not([open])') && element.checkVisibility?.() !== false,
+  );
+  back?.focus({ preventScroll: true });
+}
+
 export default function Modal({ open, onClose, title, description, size = 'md', className = '', children, labelledBy, instant = false }) {
   const ref = useRef(null);
   const pressedBackdrop = useRef(false); // the click that closes must start AND end on the dark background
@@ -28,6 +47,7 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
     if (open) {
       dialog.classList.remove('is-closing');
       if (!dialog.open) {
+        rememberFocus(dialog);
         dialog.showModal();
         // Put the cursor in the main box (marked data-autofocus) instead of on the close button.
         dialog.querySelector('[data-autofocus]')?.focus();
@@ -35,14 +55,20 @@ export default function Modal({ open, onClose, title, description, size = 'md', 
       return undefined;
     }
     if (!dialog.open || instant) {
-      if (dialog.open) dialog.close();
+      if (dialog.open) {
+        dialog.close();
+        giveFocusBack(dialog);
+      }
       setPresent(false);
       return undefined;
     }
     dialog.classList.add('is-closing');
     const timer = setTimeout(() => {
       dialog.classList.remove('is-closing');
-      if (dialog.open) dialog.close();
+      if (dialog.open) {
+        dialog.close();
+        giveFocusBack(dialog);
+      }
       setPresent(false);
     }, CLOSE_MS);
     return () => clearTimeout(timer);

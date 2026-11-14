@@ -1,0 +1,402 @@
+/* The "Find duplicates" window (Duplicates.jsx): three tabs with counts, then groups of links that may be the
+   same thing, each with "Keep both", and per link "Merge into this one" and Delete. */
+
+.modal.dup-dialog {
+  width: min(820px, calc(100vw - 32px));
+  height: min(780px, calc(100dvh - 48px));
+}
+
+/* The window keeps one height and only the list scrolls (.dup-scroll): the title, the × and the tabs with their counts
+   stay in view, and the window doesn't change size when a tab has few groups or a group goes away. */
+.modal.dup-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.dup-dialog .modal-inner {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding-bottom: 0;
+}
+
+.dup-dialog .modal-head {
+  flex: none;
+}
+
+.dup-scroll {
+  flex: 1;
+  min-height: 0;
+  margin: 8px -24px 0;
+  padding: 0 24px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* ---------- Tabs: Same page · Same website · Same name ---------- */
+
+.dup-tabs {
+  display: flex;
+  flex: none;
+  width: 100%;
+}
+
+.dup-tabs button {
+  flex: 1;
+  min-width: 0;
+  height: 36px;
+  gap: 7px;
+}
+
+.dup-tab-short {
+  display: none;
+}
+
+.dup-tab-count {
+  min-width: 22px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.dup-tabs button[aria-pressed='true'] .dup-tab-count {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.dup-hint {
+  margin: 2px 2px 16px;
+  font-size: 13.5px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* ---------- Groups ---------- */
+
+/* (minmax: a long address is cut short inside its row, it doesn't widen the whole list.) */
+.dup-list {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 14px;
+}
+
+.dup-group {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  transition: opacity 0.15s;
+}
+
+.dup-group.is-busy {
+  opacity: 0.6;
+}
+
+.dup-group-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 7px 8px 7px 14px;
+  border-bottom: 1px solid var(--line);
+  border-radius: var(--radius) var(--radius) 0 0;
+  background: var(--surface-2);
+}
+
+.dup-group-icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.dup-group-title {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14.5px;
+  font-weight: 650;
+}
+
+.dup-group-count {
+  flex: none;
+  font-size: 13px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dup-group-spin {
+  flex: none;
+  color: var(--accent-text);
+}
+
+.dup-keep {
+  flex: none;
+  height: 32px;
+  margin-left: auto;
+  padding: 0 12px;
+  font-size: 13.5px;
+}
+
+/* ---------- One link in a group ---------- */
+
+.dup-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dup-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 10px 11px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dup-row:last-child {
+  border-bottom: 0;
+}
+
+.dup-icon {
+  flex: none;
+  width: 36px;
+  height: 36px;
+}
+
+.dup-text {
+  display: grid;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.dup-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.dup-title {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* The star of a favorite: shown, not a button here */
+.dup-star.star-btn {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+}
+
+.dup-url {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 100%;
+  justify-self: start;
+  font-size: 13px;
+  color: var(--accent-text);
+  text-decoration: none;
+}
+
+.dup-url span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dup-url svg {
+  flex: none;
+}
+
+/* The dot hangs in the space before each part. The first 15px of the box are cut off, so a part that starts a new
+   line (on a phone) doesn't start with a dot. */
+.dup-meta {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 0 0 -15px;
+  clip-path: inset(0 0 0 15px);
+  font-size: 12.5px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dup-meta span {
+  position: relative;
+  margin-left: 15px;
+}
+
+.dup-meta span::before {
+  content: '·';
+  position: absolute;
+  left: -9px;
+}
+
+.dup-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+
+.dup-merge {
+  height: 32px;
+  padding: 0 11px;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.dup-merge svg {
+  color: var(--accent-text);
+}
+
+/* ---------- Loading, empty, error ---------- */
+
+.dup-skeleton-tabs {
+  display: block;
+  flex: none;
+  height: 42px;
+  border-radius: 10px;
+}
+
+.dup-skeleton-hint {
+  display: block;
+  width: 60%;
+  height: 12px;
+  margin: 6px 2px 20px;
+}
+
+.dup-skeleton-head {
+  display: block;
+  height: 48px;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+
+.dup-row .skeleton-text {
+  height: 12px;
+}
+
+.dup-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 36px 16px 28px;
+  text-align: center;
+  color: var(--text-2);
+}
+
+/* Nothing to list (or the list didn't load): the message sits in the middle of the window. */
+.dup-dialog .modal-inner > .dup-empty {
+  margin: auto;
+}
+
+.dup-empty h3 {
+  margin: 4px 0 0;
+  font-family: var(--display);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.dup-empty p {
+  max-width: 400px;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.dup-empty-mark {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--success) 16%, var(--surface));
+  color: var(--success);
+}
+
+.dup-empty.is-small {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 28px 16px;
+}
+
+.dup-empty.is-small svg {
+  color: var(--success);
+}
+
+@media (hover: hover) {
+  .dup-url:hover span {
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+}
+
+/* ---------- Phones: a full-screen sheet, the buttons under each link ---------- */
+
+@media (max-width: 640px) {
+  .modal.dup-dialog {
+    width: 100vw;
+    max-width: 100vw;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .dup-dialog .modal-inner {
+    padding: 16px 16px 0;
+  }
+
+  .dup-scroll {
+    margin: 8px -16px 0;
+    padding: 0 16px 28px;
+  }
+
+  .dup-tab-long {
+    display: none;
+  }
+
+  .dup-tab-short {
+    display: inline;
+  }
+
+  .dup-tabs button {
+    gap: 5px;
+    padding: 0 6px;
+  }
+
+  .dup-group-head {
+    padding-left: 12px;
+  }
+
+  .dup-row {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    padding: 11px 10px 11px 12px;
+  }
+
+  /* The buttons on a line of their own, under the name and address */
+  .dup-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+    padding-left: 48px;
+  }
+
+  .dup-merge {
+    flex: 1;
+  }
+}

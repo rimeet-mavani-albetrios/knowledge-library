@@ -1,7 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowUp, Lock } from 'lucide-react';
-import { api } from './api.js';
+import { api, LOGIN_NEEDED } from './api.js';
 import { useUrlState, useProgressPolling, useShortcuts, searchStep, useMediaQuery, PHONE, rememberSearch, useView } from './hooks.js';
 import { linkFilters, useKeepPlace, useLinks } from './useLinks.js';
 import Header from './components/Header.jsx';
@@ -22,6 +22,10 @@ import { useToast } from './components/Toasts.jsx';
 // The Stats page and its world map load only when you open it, so the library itself stays fast.
 const loadStats = () => import('./components/StatsPage.jsx');
 const StatsPage = lazy(loadStats);
+// The owner's "Find duplicates" window loads the first time it opens, too: most visits never need it.
+const Duplicates = lazy(() => import('./components/Duplicates.jsx'));
+// The Explore map page, also loaded only when you open it.
+const Explore = lazy(() => import('./components/Explore.jsx'));
 // The filters a click on the Stats page starts from: only the country (or category, or broken links) it was about.
 const NO_FILTERS = {
   q: '', exact: false, category: '', source: '', collection: '', tag: '', level: '', status: '', favorite: false, free: false, broken: false,
@@ -85,6 +89,8 @@ export default function App() {
   const [addOpen, setAddOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [saveButtonOpen, setSaveButtonOpen] = useState(false);
+  // "Find duplicates" from the owner's ••• menu: null until it's first opened, then open (true) or closed (false).
+  const [duplicatesOpen, setDuplicatesOpen] = useState(null);
   const searchRef = useRef(null);
   const topSearchRef = useRef(null);
   const [stuck, setStuck] = useState(false); // the big search box has scrolled out of sight
@@ -101,6 +107,41 @@ export default function App() {
       toast('Logged out');
     },
   });
+  // A change was refused because you're logged out now (api.js): the login ran out, or you logged out in another tab.
+  // A message offers to log in again, and the page drops its owner buttons. But not under an open window: that would
+  // throw away what you typed there (a private library would even swap the whole page for its login page). So the
+  // page waits until the last window has closed.
+  useEffect(() => {
+    const refreshMe = () => queryClient.invalidateQueries({ queryKey: ['me'] });
+    const windowClosed = () => {
+      if (document.querySelector('dialog[open]')) return;
+      document.removeEventListener('close', windowClosed, true);
+      refreshMe();
+    };
+    let said = null; // the message, and when it came: one failure can come with others, and one message is enough
+    let saidAt = 0;
+    const loginNeeded = () => {
+      const inWindow = Boolean(document.querySelector('dialog[open]'));
+      if (inWindow) document.addEventListener('close', windowClosed, true); // `close` doesn't bubble, so `true` is needed
+      else refreshMe();
+      if (Date.now() - saidAt < 8000) return;
+      saidAt = Date.now();
+      toast.dismiss(said);
+      // A private library with no window open goes to its own login page right now, so no button is needed there.
+      const gateNext = !inWindow && queryClient.getQueryData(['me'])?.private;
+      said = toast({
+        title: 'You’re logged out',
+        description: 'Log in again to make changes.',
+        tone: 'warning',
+        action: gateNext ? undefined : { label: 'Log in', onClick: () => setLoginOpen(true) },
+      });
+    };
+    window.addEventListener(LOGIN_NEEDED, loginNeeded);
+    return () => {
+      window.removeEventListener(LOGIN_NEEDED, loginNeeded);
+      document.removeEventListener('close', windowClosed, true);
+    };
+  }, [queryClient, toast]);
   const links = useLinks(params);
   useKeepPlace(links, params);
   const busy = links.isFetching && !links.isFetchingNextPage;
@@ -131,7 +172,7 @@ export default function App() {
   useProgressPolling();
   useShortcuts({
     '/': () => (stuck ? topSearchRef : searchRef).current?.focus(),
-    n: () => owner && setAddOpen(true),
+    n: () => owner && !params.explore && setAddOpen(true), // the Explore map has its own keys
   });
 
   useEffect(() => {
@@ -211,6 +252,28 @@ export default function App() {
     pickedOnStats.current = false;
   }, [statsOpen]);
 
+  // ---------- The Explore map page: a step of its own too (?explore=1, &focus=<link> for the picked link) ----------
+  // It covers the whole screen; the library stays where it was behind it. Explore.jsx handles its own steps and
+  // its way back. `exploreFrom` is the spot clicked on the home map, so Explore can glide in toward it.
+  const exploreOpen = Boolean(params.explore);
+  const exploreFrom = useRef(null);
+  const openExplore = useCallback(
+    spot => {
+      if (paramsRef.current.explore) return;
+      exploreFrom.current = spot ?? null;
+      setParams({ explore: true, focus: '', island: '', link: '', compare: '' }, 'explore');
+    },
+    [setParams],
+  );
+  // "Show in library" on the map: the library with only that category, as a new step, so Back returns to the map.
+  const showFromExplore = useCallback(
+    category => {
+      setParams({ ...NO_FILTERS, category, explore: false, focus: '', island: '', link: '' }, 'explore-pick');
+      requestAnimationFrame(() => scrollToResults('top'));
+    },
+    [setParams],
+  );
+
   // Opening a link's details is a step of its own, so the Back button closes them again.
   // Opening one of a search's results means the search was worth keeping in your recent searches.
   const openLink = useCallback(
@@ -229,15 +292,37 @@ export default function App() {
   useEffect(() => {
     if (picker === 'edit' && !params.compare) setPicker(null);
   }, [picker, params.compare]);
+  // The links in the compare window (from the address bar). One link alone is nothing to compare.
+  const compareIds = [...new Set(params.compare.split(',').filter(Boolean))].slice(0, MAX_COMPARE);
+  if (compareIds.length < MIN_COMPARE) compareIds.length = 0;
+  // An address with one link to compare (or the same link twice) opens nothing: it leaves the address bar,
+  // and a short message says why, instead of nothing happening at all.
+  // (Once per address: React's checks in development run an effect twice, which would say it twice.)
+  const oneToCompare = params.compare && !compareIds.length ? params.compare : '';
+  const clearedCompare = useRef('');
+  useEffect(() => {
+    if (!oneToCompare) clearedCompare.current = '';
+    if (!oneToCompare || gated || clearedCompare.current === oneToCompare) return;
+    clearedCompare.current = oneToCompare;
+    setParams({ compare: '' });
+    toast({ title: 'Pick at least 2 links to compare', tone: 'info' });
+  }, [oneToCompare, gated, setParams, toast]);
   const filtersDone = useCallback(() => requestAnimationFrame(() => scrollToResults('low')), []);
   const toggleMap = useCallback(() => setMapOpen(open => !open), []);
+  // No links at all yet: the examples and the toolbar have nothing to work on, so they wait for the first link.
+  // (Not while the answer is on its way: a library with links never shows without them.)
+  const empty = me.data?.total === 0;
+  // The last link is gone: nothing is left to select, and the toolbar with its Select button is gone too.
+  useEffect(() => {
+    if (empty) stopSelecting();
+  }, [empty, stopSelecting]);
   const map = useMemo(() => (phone ? { open: mapOpen, onToggle: toggleMap } : null), [phone, mapOpen, toggleMap]);
 
   // Which window is open. Going straight from one to the other (details ↔ compare, Back included, or the compare
   // picker → compare) swaps them without their open and close animations: no flash of the page, no doubled
   // darkness. The swap mark stays while that window is open, because taking it away would start the animation late.
   // (The picker on top of the compare window, to change its links, is not a window of its own here.)
-  const openWindow = params.link ? 'link' : params.compare ? 'compare' : picker === 'pick' ? 'picker' : '';
+  const openWindow = params.link ? 'link' : compareIds.length ? 'compare' : picker === 'pick' ? 'picker' : '';
   const windowState = useRef({ open: openWindow, swapped: false });
   if (windowState.current.open !== openWindow) {
     windowState.current = { open: openWindow, swapped: Boolean(windowState.current.open && openWindow) };
@@ -258,6 +343,15 @@ export default function App() {
   const showTag = tag => {
     setParams({ tag, q: '', link: '' });
     requestAnimationFrame(() => scrollToResults('low'));
+  };
+  // A tag in a link's details: every link with that tag, with the search gone. From the Stats page and the Explore map
+  // that means going to the library with only that tag on, as a new step, like their own clicks: Back returns there.
+  const tagFromDetails = tag => {
+    if (statsOpen) showFromStats({ tag });
+    else if (exploreOpen) {
+      setParams({ ...NO_FILTERS, tag, explore: false, focus: '', island: '', link: '' }, 'explore-pick');
+      requestAnimationFrame(() => scrollToResults('top'));
+    } else showTag(tag);
   };
   const toResults = () => {
     const first = document.querySelector('#results .card-open');
@@ -292,9 +386,12 @@ export default function App() {
     else setParams({ compare: '' });
   };
   const openFromCompare = id => setParams({ link: id, compare: '' }, 'link');
-  // The links in the compare window (from the address bar). One link alone is nothing to compare.
-  const compareIds = [...new Set(params.compare.split(',').filter(Boolean))].slice(0, MAX_COMPARE);
-  if (compareIds.length < MIN_COMPARE) compareIds.length = 0;
+  // The compare window's links changed (one taken out, or gone from the library). Fewer than 2 left closes the
+  // window the way Back would, so the next Back goes where you came from.
+  const changeCompare = newIds => {
+    if (newIds.length < MIN_COMPARE) closeCompare();
+    else setParams({ compare: newIds.join(',') });
+  };
   // The picker opens the compare window (it closes itself without its fade then: see ComparePicker.jsx).
   const compareFromPicker = pickedIds => {
     setPicker(null);
@@ -322,31 +419,34 @@ export default function App() {
         onLogin={() => setLoginOpen(true)}
         onLogout={() => logout.mutate()}
         onSaveButton={() => setSaveButtonOpen(true)}
+        onDuplicates={() => setDuplicatesOpen(true)}
       />
       <main className="container page" id="links" style={statsOpen ? { display: 'none' } : undefined}>
         <section className="hero" aria-label="Search">
           <h2 className="hero-title">Find anything you saved by saying what you want to do.</h2>
-          <SearchBar ref={searchRef} {...searchBox} />
+          <SearchBar ref={searchRef} {...searchBox} examples={!empty} />
         </section>
         {/* On phones the map waits behind the toolbar's Map button, so your links come first. */}
-        {!phone && <KnowledgeMap params={browse} onOpen={openLink} />}
+        {!phone && <KnowledgeMap params={browse} onOpen={openLink} onExplore={openExplore} />}
         {/* The toolbar (with the chips of the filters that are on) sticks to the top while you scroll through
             the results, so this box holds both. */}
-        <div className="browse" id="browse">
-          <Toolbar
-            params={browse}
-            setParams={setParams}
-            owner={owner}
-            facets={facets}
-            view={view}
-            onView={setView}
-            selecting={selecting}
-            onSelecting={setSelecting}
-            onCompare={openPicker}
-            map={map}
-            onFiltersDone={filtersDone}
-          />
-          {phone && mapOpen && <KnowledgeMap params={browse} panel onOpen={openLink} />}
+        <div className={`browse${empty ? ' is-empty' : ''}`} id="browse">
+          {empty ? null : (
+            <Toolbar
+              params={browse}
+              setParams={setParams}
+              owner={owner}
+              facets={facets}
+              view={view}
+              onView={setView}
+              selecting={selecting}
+              onSelecting={setSelecting}
+              onCompare={openPicker}
+              map={map}
+              onFiltersDone={filtersDone}
+            />
+          )}
+          {phone && mapOpen && !empty && <KnowledgeMap params={browse} panel onOpen={openLink} onExplore={openExplore} />}
           <LinkGrid
             params={browse}
             setParams={setParams}
@@ -364,21 +464,32 @@ export default function App() {
           <StatsPage owner={owner} onBack={closeStats} onShow={showFromStats} onOpenLink={openLink} />
         </Suspense>
       ) : null}
+      {exploreOpen ? (
+        <Suspense fallback={null}>
+          <Explore
+            params={params}
+            setParams={setParams}
+            owner={owner}
+            start={exploreFrom.current}
+            onOpenLink={openLink}
+            onCompare={openCompare}
+            onShowCategory={showFromExplore}
+          />
+        </Suspense>
+      ) : null}
       <LinkDrawer
         id={params.link}
         q={params.q}
         owner={owner}
         categories={me.data?.categories ?? []}
-        ids={statsOpen ? [] : ids}
+        ids={statsOpen || exploreOpen ? [] : ids}
+        total={links.data?.pages[0]?.total}
         onClose={closeLink}
         onOpen={openLink}
         onNearEnd={loadMore}
         onCompare={openCompare}
         instant={swapped}
-        onTag={tag => {
-          setParams({ tag, link: '' });
-          requestAnimationFrame(() => scrollToResults('low'));
-        }}
+        onTag={tagFromDetails}
       />
       <CompareWindow
         ids={compareIds}
@@ -387,7 +498,7 @@ export default function App() {
         instant={swapped}
         onClose={closeCompare}
         onOpenLink={openFromCompare}
-        onChangeIds={compareIds => setParams({ compare: compareIds.join(',') })}
+        onChangeIds={changeCompare}
         onEditLinks={() => setPicker('edit')}
       />
       {/* After the compare window, so in 'edit' it opens on top of it (and messages go to the window on top). */}
@@ -402,6 +513,11 @@ export default function App() {
       />
       {owner && <AddDialog open={addOpen} onClose={() => setAddOpen(false)} />}
       {owner && <SaveButtonDialog open={saveButtonOpen} onClose={() => setSaveButtonOpen(false)} />}
+      {owner && duplicatesOpen !== null ? (
+        <Suspense fallback={null}>
+          <Duplicates open={duplicatesOpen} onClose={() => setDuplicatesOpen(false)} />
+        </Suspense>
+      ) : null}
       <LoginDialog open={loginOpen} onClose={() => setLoginOpen(false)} />
       <BackToTop />
     </>

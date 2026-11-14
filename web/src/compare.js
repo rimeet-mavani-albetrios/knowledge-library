@@ -136,3 +136,34 @@ export function rememberComparison(links) {
 }
 
 export const useRecentComparisons = () => useSyncExternalStore(subscribe, () => recent);
+
+// ---------- Deleted links ----------
+// A deleted link leaves your picks and your recent comparisons. A recent comparison keeps its other links, and
+// goes when fewer than 2 are left (nothing to compare). The ids are also noted for this tab, so a comparison still
+// holding one (Back into it) takes it out quietly: you know it's gone, you just deleted it.
+const deleted = new Set();
+
+export function forgetLinks(ids) {
+  for (const id of ids) deleted.add(id);
+  const gone = id => ids.includes(id);
+  const without = item => ({ ...item, ids: item.ids.filter(id => !gone(id)), links: item.links.filter(link => !gone(link.id)) });
+  const nextPicks = picks.filter(pick => !gone(pick.id));
+  const nextRecent = recent
+    .map(item => (item.ids.some(gone) ? without(item) : item))
+    .filter(item => item.ids.length >= MIN_COMPARE)
+    // Two comparisons that became the same links show once (the newer one).
+    .filter((item, i, all) => all.findIndex(other => sameIds(other.ids, item.ids)) === i);
+  const picksChanged = nextPicks.length !== picks.length;
+  const recentChanged = nextRecent.length !== recent.length || nextRecent.some((item, i) => item !== recent[i]);
+  if (picksChanged) {
+    picks = nextPicks;
+    store(KEY, picks);
+  }
+  if (recentChanged) {
+    recent = nextRecent;
+    store(RECENT_KEY, recent);
+  }
+  if (picksChanged || recentChanged) emit(); // once, so the picker is drawn again once
+}
+
+export const wasDeleted = id => deleted.has(id);

@@ -1,4 +1,5 @@
-// Extra details for GitHub repositories: stars, language, topics, license and the README text.
+// Extra details for GitHub repositories: stars, language, topics, license and the README text, and where the
+// repository's owner is (for the link's country).
 
 const clean = text => String(text ?? '').replace(/\s+/g, ' ').trim();
 
@@ -21,10 +22,60 @@ export function parseRepo(input) {
   return { owner, name: name.replace(/\.git$/, ''), isRoot: rest.length === 0 };
 }
 
+// GitHub's hourly limit, as its last answer told it: without a token only 60 questions an hour for everything the
+// robot asks (new repos, stars, owners' countries), so the slower jobs can check what's left before asking.
+const limit = { left: null, resetAt: 0 };
+
+// The account behind a repository or a profile page: "github.com/yt-dlp/yt-dlp" and "github.com/yt-dlp" → "yt-dlp".
+export function parseOwner(input) {
+  const repo = parseRepo(input);
+  if (repo) return repo.owner;
+  try {
+    const url = new URL(input);
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (url.hostname.replace(/^www\./, '') !== 'github.com' || parts.length !== 1) return null;
+    return NOT_OWNERS.has(parts[0].toLowerCase()) ? null : parts[0];
+  } catch {
+    return null;
+  }
+}
+
 function githubFetch(path, accept = 'application/vnd.github+json') {
   const headers = { accept, 'user-agent': 'knowledge-library-robot', 'x-github-api-version': '2022-11-28' };
   if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
-  return fetch(`https://api.github.com${path}`, { headers, signal: AbortSignal.timeout(20_000) });
+  return fetch(`https://api.github.com${path}`, { headers, signal: AbortSignal.timeout(20_000) }).then(res => {
+    const left = Number(res.headers.get('x-ratelimit-remaining'));
+    const reset = Number(res.headers.get('x-ratelimit-reset'));
+    if (res.headers.has('x-ratelimit-remaining') && Number.isFinite(left) && Number.isFinite(reset)) {
+      limit.left = left;
+      limit.resetAt = reset * 1000;
+    }
+    return res;
+  });
+}
+
+// { left, resetAt }: questions left this hour and when the count starts again. `left` is null while unknown.
+export function githubLimit() {
+  return Date.now() < limit.resetAt ? { ...limit } : { left: null, resetAt: 0 };
+}
+
+// GitHub said no because the hour's questions are used up: try again after `retryAt` (a time in ms).
+export class GithubLimited extends Error {
+  constructor(retryAt) {
+    super('GitHub’s hourly limit is used up');
+    this.retryAt = retryAt;
+  }
+}
+
+// The person or company behind a repository: the "location" they typed on their profile ("Bengaluru, India").
+// Returns null when GitHub can't be reached, { missing: true } when the account is gone.
+export async function readOwner(login) {
+  const res = await githubFetch(`/users/${encodeURIComponent(login)}`);
+  if (res.status === 404) return { missing: true };
+  if ((res.status === 403 || res.status === 429) && limit.left === 0) throw new GithubLimited(limit.resetAt);
+  if (!res.ok) return null;
+  const user = await res.json();
+  return { login: user.login ?? login, type: user.type ?? null, location: clean(user.location) || null };
 }
 
 // Returns null when GitHub can't be reached, { missing: true } when the repo was deleted.

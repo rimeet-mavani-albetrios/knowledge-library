@@ -28,15 +28,14 @@ export default function YouTubeBuzz({ facts }) {
 
   return (
     <section className="fact-card fact-youtube">
-      <h3 className="fact-card-title">On YouTube</h3>
+      <h3 className="fact-card-title">
+        <CirclePlay size={14} aria-hidden="true" /> On YouTube
+      </h3>
       {top.length > 0 ? (
         <>
           <p className="fact-youtube-count">
-            <CirclePlay size={18} aria-hidden="true" />
-            <span>
-              <strong>{videoCount(youtube.videos)}</strong>
-              {youtube.query && <> for “{youtube.query}”</>}
-            </span>
+            <strong>{videoCount(youtube.videos)}</strong>
+            {youtube.query ? <> for “{youtube.query}”</> : null}
           </p>
           <ul className="fact-videos" aria-label="Most watched tutorials">
             {top.map(video => {
@@ -61,11 +60,11 @@ export default function YouTubeBuzz({ facts }) {
               );
             })}
           </ul>
-          {searchUrl && (
-            <a className="detail-link-btn fact-more" href={searchUrl} target="_blank" rel="noopener noreferrer">
+          {searchUrl ? (
+            <a className="fact-more" href={searchUrl} target="_blank" rel="noopener noreferrer">
               See all on YouTube <ExternalLink size={13} aria-hidden="true" />
             </a>
-          )}
+          ) : null}
         </>
       ) : (
         <p className="fact-empty">No YouTube tutorials found for it yet.</p>

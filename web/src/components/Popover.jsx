@@ -2,8 +2,36 @@
 // On big screens they hang under their button. On phones they slide up from the bottom of the screen
 // (a "sheet") with the page dimmed behind. Click outside or press Esc to close.
 // They look the same on every computer and phone, unlike the browser's own <select> dropdowns.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Check, ChevronDown, X } from 'lucide-react';
+import { PHONE } from '../hooks.js';
+
+const MIN_ROOM = 240;
+
+// Keeps an open panel inside the window: it's only as tall as the room under its button (--fp-room on `wrap`: what's in
+// it scrolls). Opened low on the screen, the page first moves up a little, until there is `want` px of room; the
+// toolbar sticks under the top bar, so that always works on a long page. Phones show a sheet instead.
+export function useRoomBelow(open, button, wrap, want = 420) {
+  useLayoutEffect(() => {
+    if (!open || window.matchMedia(PHONE).matches) return undefined;
+    const measure = () => {
+      const room = window.innerHeight - button.current.getBoundingClientRect().bottom - 24;
+      wrap.current.style.setProperty('--fp-room', `${Math.max(MIN_ROOM, Math.round(room))}px`);
+      return room;
+    };
+    const room = measure();
+    if (room < want) {
+      window.scrollBy({ top: want - room, behavior: 'instant' });
+      measure();
+    }
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, { passive: true });
+    return () => {
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure);
+    };
+  }, [open, button, wrap, want]);
+}
 
 // `anchor` is the button that opens it: clicks on it don't count as "outside", and Esc gives it the focus back.
 // `focusFirst` (a CSS selector) is what gets the focus when it opens.
@@ -53,12 +81,14 @@ export function Popover({ open, onClose, anchor, label, role, className = '', fo
 // Our own dropdown: a button with the current choice, and a list to pick from.
 // Keys: ↓ or Enter opens it, ↑ ↓ move, Enter picks, Esc closes.
 // `options` are [{ value, label, short?, Icon?, count? }]; `title` names the list ("Sort by").
-// `short` is shown on the button on phones.
-export function Dropdown({ title, value, options, onChange, icon: ButtonIcon, className = '' }) {
+// `short` is shown on the button on phones. `roomBelow` (px) is for a list on the page itself: see useRoomBelow.
+export function Dropdown({ title, value, options, onChange, icon: ButtonIcon, className = '', roomBelow = 0 }) {
   const [open, setOpen] = useState(false);
   const close = useCallback(() => setOpen(false), []);
   const button = useRef(null);
   const list = useRef(null);
+  const wrap = useRef(null);
+  useRoomBelow(open && roomBelow > 0, button, wrap, roomBelow);
   // No options at all (a list still loading, say): the button shows the title and opens an empty list.
   const current = options.find(option => option.value === value) ?? options[0] ?? { value, label: title };
 
@@ -88,7 +118,7 @@ export function Dropdown({ title, value, options, onChange, icon: ButtonIcon, cl
   };
 
   return (
-    <div className={`dropdown ${className}`}>
+    <div ref={wrap} className={`dropdown ${className}`}>
       <button
         ref={button}
         type="button"

@@ -10,7 +10,7 @@
 // The stack is a "manual popover": that puts it in the browser's top layer, so it is seen above open dialog windows
 // (the detail window, "Add links"), which would otherwise cover it with their backdrop.
 // While a window is open, the browser also locks everything outside it (no clicks, no focus), so the stack moves
-// inside that window: its buttons ("Compare now", ×) keep working there.
+// inside that window: its buttons ("Compare now", "Undo", ×) keep working there, also when the window opens later.
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { CircleCheck, CircleAlert, Info, TriangleAlert, X } from 'lucide-react';
@@ -24,8 +24,9 @@ const ToastContext = createContext(Object.assign(() => '', { dismiss: () => {} }
 export const useToast = () => useContext(ToastContext);
 
 // The open window on top, if any. An "are you sure?" question always opens above the window it's about.
+// (Not one that is fading out: a message put in it would fade out with it.)
 function topWindow() {
-  const open = [...document.querySelectorAll('dialog')].filter(dialog => dialog.matches(':modal'));
+  const open = [...document.querySelectorAll('dialog')].filter(dialog => dialog.matches(':modal') && !dialog.classList.contains('is-closing'));
   return open.find(dialog => dialog.classList.contains('confirm-dialog')) ?? open.at(-1) ?? null;
 }
 
@@ -105,17 +106,19 @@ export function ToastProvider({ children }) {
     return Object.assign(show, { dismiss, pause, resume });
   }, []);
 
-  // The window the stack sits in has closed: back to the page (or into the window under it), so a message shown
-  // as a window closes ("Link deleted") stays in view. It watches the window's `open` attribute, which changes at
-  // once, rather than waiting for the window's close event.
+  // While there are messages, the stack follows the window on top. A window closed: back to the page (or into the
+  // window under it), so a message shown as a window closes ("Link deleted") stays in view. A window opened: into it,
+  // so "Undo" can still be pressed. It watches the windows' `open` attribute, which changes at once, rather than
+  // waiting for their open and close events.
+  const showing = toasts.length > 0;
   useEffect(() => {
-    if (!host) return undefined;
-    const moveOut = () => !host.open && setHost(topWindow());
-    const observer = new MutationObserver(moveOut);
-    observer.observe(host, { attributes: true, attributeFilter: ['open'] });
-    moveOut(); // it may have closed already
+    if (!showing) return undefined;
+    const follow = () => setHost(topWindow());
+    const observer = new MutationObserver(follow);
+    observer.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['open'] });
+    follow(); // it may have changed already
     return () => observer.disconnect();
-  }, [host]);
+  }, [showing]);
 
   // Keep the stack in the top layer while it has something to show. A new message puts it back on top,
   // above any dialog window opened in the meantime (the top layer is stacked in the order things were opened).

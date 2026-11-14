@@ -9,6 +9,7 @@
   display: flex;
   flex-direction: column;
   max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 24px); /* a short window: the words scroll, the buttons stay in view */
   background: var(--surface);
   border: 1px solid color-mix(in oklab, var(--hue) 35%, var(--line));
   border-radius: var(--radius-lg);
@@ -16,6 +17,13 @@
   overflow: hidden;
   animation: peek-in 0.15s ease-out both;
   transform-origin: left top;
+}
+
+/* Dark: no colored glow under it (it looks noisy on a dark page), just a deep soft shadow and a hint of the
+   category in the border. */
+:root[data-theme='dark'] .peek {
+  border-color: color-mix(in oklab, var(--hue) 25%, var(--line-strong));
+  box-shadow: var(--shadow), 0 24px 48px -20px rgb(0 0 0 / 0.75);
 }
 
 /* It grows out from the side the item is on. */
@@ -40,11 +48,22 @@
   margin: 8px 8px 0;
 }
 
+.peek .preview {
+  flex: none;
+}
+
 .peek-body {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
   padding: 12px 16px 4px;
+  overflow-y: auto;
+}
+
+.peek-body > * {
+  flex: none;
 }
 
 .peek-meta {
@@ -76,7 +95,7 @@
 .peek-star {
   display: inline-grid;
   place-items: center;
-  color: #e8a200;
+  color: var(--star);
 }
 
 .peek-star svg {
@@ -162,6 +181,7 @@
 
 .peek-foot {
   display: flex;
+  flex: none;
   gap: 8px;
   padding: 12px 16px 14px;
 }
@@ -170,4 +190,11 @@
   flex: 1;
   height: 36px;
   font-size: 14px;
+}
+
+/* A short window has no room for the picture too. */
+@media (max-height: 620px) {
+  .peek .preview {
+    display: none;
+  }
 }

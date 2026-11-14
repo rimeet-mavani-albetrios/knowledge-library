@@ -54,6 +54,10 @@ ALTER TABLE links
   ADD COLUMN IF NOT EXISTS opened_at     TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS robot_version INT NOT NULL DEFAULT 0;       -- which version of the robot read it
 
+-- The fields you edited yourself (their column names): the robot never writes over them. Starts empty for every link;
+-- adding a column like this changes the table's description only, it doesn't rewrite the links.
+ALTER TABLE links ADD COLUMN IF NOT EXISTS edited TEXT[] NOT NULL DEFAULT '{}';
+
 -- The words for word search. Where a word is found decides how much it counts:
 -- A = name and "what you can do with it", B = tags, search words, headings, C = summaries, D = all the page text.
 CREATE OR REPLACE FUNCTION links_search_update() RETURNS trigger AS $$

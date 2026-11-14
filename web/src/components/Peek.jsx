@@ -41,6 +41,7 @@ const subscribe = listener => {
 // the next scroll step. While you scroll (and a moment after) no panel is planned, and one about to show is called off.
 const SCROLL_REST = 150;
 let scrolledAt = 0;
+let skipped = null; // the item the mouse landed on while scrolling: its panel is planned when the mouse moves again
 if (typeof window !== 'undefined') {
   window.addEventListener(
     'scroll',
@@ -65,8 +66,12 @@ export function hidePeek() {
 function schedule(anchor, x, latest) {
   clearTimeout(showTimer);
   clearTimeout(hideTimer);
+  skipped = null;
   if (state?.id === latest.current.link.id) return; // back from the panel onto the same item: keep it
-  if (Date.now() - scrolledAt < SCROLL_REST) return;
+  if (Date.now() - scrolledAt < SCROLL_REST) {
+    skipped = latest.current.link.id;
+    return;
+  }
   const warm = state || Date.now() - hiddenAt < 300;
   showTimer = setTimeout(() => {
     const { link, owner, onOpen } = latest.current;
@@ -83,6 +88,7 @@ function scheduleHide() {
 // The mouse left an item: a panel that hadn't shown yet is forgotten; one that shows gets a moment of grace.
 function leave() {
   clearTimeout(showTimer);
+  skipped = null;
   if (state) scheduleHide();
 }
 
@@ -110,6 +116,9 @@ export function usePeek(link, { owner, onOpen, selectable = false }) {
     onPointerEnter: event => {
       if (event.pointerType === 'touch' || !canPeek()) return;
       schedule(event.currentTarget, event.clientX, latest);
+    },
+    onPointerMove: event => {
+      if (skipped === link.id && Date.now() - scrolledAt >= SCROLL_REST) schedule(event.currentTarget, event.clientX, latest);
     },
     onPointerLeave: leave,
     // A click opens the details (or the website): a panel arriving over them a moment later would be odd.
